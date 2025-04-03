@@ -74,7 +74,7 @@ See `.env.example` for a complete template.
 Run the script with:
 
 ```
-python main.py
+python news_poster_V3.py
 ```
 
 The script will:
@@ -105,6 +105,22 @@ To run the script every hour:
 ## News Feed Datasource
 
 The news source primary feed comes from the https://news.google.com rss feed.
+
+The table has this format:
+
+| URL | Title |
+|-----|-------|
+| [Link](https://news.google.com/rss/articles/CBMiqgFBVV95cUxPa2R1Qk1OMFlIbVNrR2lySW5BeXZwNWwxSUJVS2haZ25rd1Jfd2pjU1hhNmkwTFlscHBnTnpvdzhEQnRwbng5T3BwZzJreUZuZUNxcklUQUpGSWNBVkp4c3poQ0FnZzM0UkhockprR0FuWlRjTWNEbFF1OHBPbWlwYjR2SGNqTEwtdldCOUowSHFpMjQ0RUlfYURPMzNqRTVzai0xZzBBMWJFUQ?oc=5) | Mayor Eric Adams' case dismissed with prejudice despite Trump admin's request to allow for later prosecution - ABC News |
+| [Link](https://news.google.com/rss/articles/CBMipAFBVV95cUxPckVuNkFqclBocExaZkZYZE5IVE10c3VlcU5fYkpHcUFtQ2M0MzJxcWF6QUwtMjIySmw4ZFJXS3RsbGxpM1RJU0RPcUpGWWtUaEN1R1NfaWR0R2dBdWFQeVFna25OeUJYOHVycW5sNGEzREhnRy1mSkt6UVpYN0RPOVBXaVJVNnpFeGM5bkVaM1Zhbzl1NU4yQlhfUWlmbGVTYUxXLdIBqgFBVV95cUxPeVIweXVIUjVsWFFTMjNkSDI1X2RadVJEM01NZFNzc3ZjOGZxdHh0ZEtTYkVac3FfZy1PQ2ZjUVlhNTFpa0s2VjhvcEtSQklWRngxWUZfeXhRNW9HWXhoWVhMcHFwTk84WVhkLU9FN0NKVG5aMm1oUkkyaHc2SDVsZ1hubGZHSFZXYjBaN21SS3ZrMXhGc09lMEN5OFgtdXhpSnVHTHVhX0R3QQ?oc=5) | Remains of 4th missing US soldier found in Lithuania - ABC News |
+| [Link](https://news.google.com/rss/articles/CBMikgFBVV95cUxOclBiMmhDRHZHSVRDTlpRRUtJNTJUNXJFaVVaUmh6eW96ZkpQVTR4V01yMWxVUnlYWnZzNGFJWFZNM2hhSmczNjU1bkRWV0MtN2lsTW1pT2o0WDRYbTQ4UzhfUTFxYVFPeWs3NUY1SE5IWmZmalZwWURkdEhlWGJwelZPTkFVT1k5Qjl5UWU2UFl4dw?oc=5) | Some Aid Workers Killed in Gaza Were Shot Multiple Times, Officials Say - The New York Times |
+| [Link](https://news.google.com/rss/articles/CBMiqgFBVV95cUxPa2R1Qk1OMFlIbVNrR2lySW5BeXZwNWwxSUJVS2haZ25rd1Jfd2pjU1hhNmkwTFlscHBnTnpvdzhEQnRwbng5T3BwZzJreUZuZUNxcklUQUpGSWNBVkp4c3poQ0FnZzM0UkhockprR0FuWlRjTWNEbFF1OHBPbWlwYjR2SGNqTEwtdldCOUowSHFpMjQ0RUlfYURPMzNqRTVzai0xZzBBMWJFUdIBrwFBVV95cUxOeGM3RGdPV2FzTDFVcjRqWGE2aHRnd21lVlF1bEZFSUtlNnNKMnR1blhQa3hyOVZVeDlaWUpPVFVBaXZ2WXFSTDBWVzdFdXRFTGVGSW55R3FlOE1BT3RNQ1hXbFdPcE1Eck96M1ZTYnQ0RUZ2QTJHd0Q5RGljaFJORjBndS11bVBSSU05OWV2QkZqSVdKZ3laMF9ycXZzMlp0bm9tTlVvUmFPWVE2MW5v?oc=5) | Mayor Eric Adams' case dismissed with prejudice despite Trump admin's request to allow for later prosecution - ABC News |
+| [Link](https://news.google.com/rss/articles/CBMiWkFVX3lxTE1HQVA3Mkdsb2dPcmd5M0FIU3RhR3JCckRzNjlzVDB5Yk5BamlqTHBNd1ZqVGlvVG44SUlOZFhSN3JBaFJXS1JFbVBFRG5pVUpHWGpfT0ZwR180QdIBX0FVX3lxTE9HRW9LV3ZDSDUzNnM2TklGa1dWZ2lLN01ZV19rOEQ5QXJ5cXo1dk9Gb0VIQTZIOG5lT1NoX3RMdlVhc2o4akZRcm5FN2Z4ejNFRWh5Y3IyY2JnUTIzX1pz?oc=5) | Muse and Robbie Williams face pressure to cancel Turkish gigs - BBC |
+| [Link](https://news.google.com/rss/articles/CBMiWkFVX3lxTE4zUGFZMi1xNXBGMG5hVUhrUGI2YTh0U1dmV0NhaFRDRFZVRDBzcUlVVFBrVS1qY2ROcUxCN0FtdUp2M2VhMFdjc1MwOFl0V2RfQzRjYnpzMEZ4Zw?oc=5) | Waqf bill: India Lok Sabha passes controversial bill on Muslim properties - BBC |
+| [Link](https://news.google.com/rss/articles/CBMipgFBVV95cUxNbmtkRDJmMExiNk1UQmxJNkRVWldpRjVFbjhISmYxRG9obWdPN3dBd2lZR1lGRV9RMnpNTVpsdHFzclpTVGMwVWhBbzlBM3VnRk5Qd1NLeEM3QnB2NXZycW1CTm5TMUdVX3NCY1E5N3hQT0JEQXdLcGxKRk9NdHRxOEpsRnU5X0hLMWtSTW53b1ctWWF0d1BDMER1LWhhVTdPdk92MER30gGrAUFVX3lxTE1iMFdsUDl3enp6Rms5OGNVZDVlNFVTNHdEQmZubE1MeXJVWlRHMl80NFdocVlzSy1paXVlbUF2YmwwSWNlZXVpME10YkZGMnltZmlFaVNTOXZmOExQeE9uVFVfTWk4ZE9pVVd6dUVqLWhhRmZiQmFVeHE1NnBBZUFGQVhBeDVWSGNVSnowRjlURkNMLXpBX0ZBT2owMXBVa3RCVlFaYWU0ZW5rMA?oc=5) | Musk still plans a major role in midterm elections despite loss in Wisconsin: Sources - ABC News |
+| [Link](https://news.google.com/rss/articles/CBMieEFVX3lxTE5NZEtIb2NXNjlvbkJFdENRWnl5R283bHdxS01HQ2JfVlg1NHAxYXk5enJoQnVHSE9UMVVPOUhaalEzUzhLd2lNQXBZR2ItQVNadThGRHJpdURmMEFuZ1BzMTZHZDd0cE1DcnJwR2tPd0xMMjFTcHVtOA?oc=5) | Supreme Court Sides With Truck Driver Fired Over Drug Test - The New York Times |
+| [Link](https://news.google.com/rss/articles/CBMimgFBVV95cUxPRGZoS2FWclJUd0lNQlN5ZDlqdnk4MjR1M2g0VFA3bW9TbEVRcjBKRjB3WWNtTUc5Y3ZFX2FoVDRabHBuLUxPVXRLam9rajdVcUE2TDdlb1JlQ0ItbDNKSER5ZXZ4N0t2dXh2cURkNGpMdDY2ZGloRHVtelZYOHBaRUh4LWtXZ0JZcENRQ05sRm1ndVNBZDZldy1B0gGfAUFVX3lxTFBDVGNKaV9wTmU3bGctektrYm52SjV5VDdTTWZIWkpVVjhaRW9zNnlXaEIzcGtTemZrb3Fkdi1FaFFadmFMOHFtVWxiRDAwdk9VcUQ4Z0xxbWxzOEVLdzI1cG92d3FoUUdsc29wS0dKbVF1eGUtTkdiN3ZldEJqcjNld1ppb1RKYTRnYlA5bFpOOUszM1NscDlNdmp6dzBJZw?oc=5) | Trump Administration Explores Costly Option For Greenland Takeover: Report - HuffPost |
+| [Link](https://news.google.com/rss/articles/CBMimwFBVV95cUxNbXByY0xxbFZPZlBXWDRXWE55OWhQTmRvQXRvQ2pudTd4WG5PVXltYW1hSzBYeDVKSmRKZFBIQlFpQ1ktZ1BSTDRPZjgwa2dNaGR4aHVtZ0RXUDk3Ymk2Vzh3QkwzQVoyS2RmTUpQaXprTHY4ckRhWDhkVjZFa2RPT0Nhcm9BQ1ZzVDdiQWhLOWxQSXlpQTFEX1lMZw?oc=5) | Trump tariffs: List of global responses and countermeasures - Reuters |
+
 
 ## Author
 

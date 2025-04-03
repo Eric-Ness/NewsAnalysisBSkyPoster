@@ -30,4 +30,3 @@ global conn
 conn = pyodbc.connect(connection_string)
 
 conn.setdecoding(pyodbc.SQL_CHAR, encoding='utf-8')
-#conn.setencoding(encoding='utf-8')
