@@ -19,7 +19,7 @@ def get_news_feed_data():
         SELECT URL, Title, Source_Count
         FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
         WHERE Language_ID = 23
-        AND (Category_ID = 2 OR Category_ID = 1)
+        AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
         AND [Published_Date] >= DATEADD(day, -1, GETDATE())
         AND Source_Count > 1
     ),
@@ -28,14 +28,14 @@ def get_news_feed_data():
         SELECT URL, Title, Source_Count
         FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
         WHERE Language_ID = 23
-        AND (Category_ID = 2 OR Category_ID = 1)
+        AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
         AND [Published_Date] >= DATEADD(day, -1, GETDATE())
         AND Source_Count > 0
         AND Source_Count < (
             SELECT MAX(Source_Count)
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
-            AND (Category_ID = 2 OR Category_ID = 1)
+            AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 0
         )

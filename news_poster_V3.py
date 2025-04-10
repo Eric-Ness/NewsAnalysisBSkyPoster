@@ -757,7 +757,7 @@ class NewsAnalyzer:
                 'sfchronicle.com', 'wsj.com', 'nytimes.com',
                 'ft.com', 'bloomberg.com', 'washingtonpost.com',
                 'whitehouse.gov', 'treasury.gov', 'justice.gov',
-                'fortune.com'
+                'fortune.com', '.gov'
             ]
             
             if any(domain in real_url.lower() for domain in known_paywall_domains):
