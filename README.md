@@ -124,6 +124,7 @@ The table has this format:
 ## Change Log
 
 2025.04.11 - Increased amount of new LLM could choose from 120 to 160. 
+
 2025.04.10 - Added business news to the data feed
 
 ## Author
