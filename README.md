@@ -121,6 +121,10 @@ The table has this format:
 | [Link](https://news.google.com/rss/articles/CBMimgFBVV95cUxPRGZoS2FWclJUd0lNQlN5ZDlqdnk4MjR1M2g0VFA3bW9TbEVRcjBKRjB3WWNtTUc5Y3ZFX2FoVDRabHBuLUxPVXRLam9rajdVcUE2TDdlb1JlQ0ItbDNKSER5ZXZ4N0t2dXh2cURkNGpMdDY2ZGloRHVtelZYOHBaRUh4LWtXZ0JZcENRQ05sRm1ndVNBZDZldy1B0gGfAUFVX3lxTFBDVGNKaV9wTmU3bGctektrYm52SjV5VDdTTWZIWkpVVjhaRW9zNnlXaEIzcGtTemZrb3Fkdi1FaFFadmFMOHFtVWxiRDAwdk9VcUQ4Z0xxbWxzOEVLdzI1cG92d3FoUUdsc29wS0dKbVF1eGUtTkdiN3ZldEJqcjNld1ppb1RKYTRnYlA5bFpOOUszM1NscDlNdmp6dzBJZw?oc=5) | Trump Administration Explores Costly Option For Greenland Takeover: Report - HuffPost |
 | [Link](https://news.google.com/rss/articles/CBMimwFBVV95cUxNbXByY0xxbFZPZlBXWDRXWE55OWhQTmRvQXRvQ2pudTd4WG5PVXltYW1hSzBYeDVKSmRKZFBIQlFpQ1ktZ1BSTDRPZjgwa2dNaGR4aHVtZ0RXUDk3Ymk2Vzh3QkwzQVoyS2RmTUpQaXprTHY4ckRhWDhkVjZFa2RPT0Nhcm9BQ1ZzVDdiQWhLOWxQSXlpQTFEX1lMZw?oc=5) | Trump tariffs: List of global responses and countermeasures - Reuters |
 
+## Change Log
+
+2025.04.11 - Increased amount of new LLM could choose from 120 to 160. 
+2025.04.10 - Added business news to the data feed
 
 ## Author
 
