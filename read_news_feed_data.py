@@ -45,7 +45,7 @@ def get_news_feed_data():
         SELECT URL, Title
         FROM TopSources
         UNION ALL
-        SELECT TOP(120 - (SELECT COUNT(*) FROM TopSources)) URL, Title
+        SELECT TOP(160 - (SELECT COUNT(*) FROM TopSources)) URL, Title
         FROM RemainingItems
         ORDER BY NEWID()
     ) AS Combined
