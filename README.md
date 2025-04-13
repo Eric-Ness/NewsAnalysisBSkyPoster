@@ -123,6 +123,7 @@ The table has this format:
 
 ## Change Log
 
+2025.04.13 - Keep track bsky posts, extracted article text, and pertinent URLs.  
 2025.04.11 - Increased amount of news LLM could choose from 120 to 160 news items.  
 2025.04.10 - Added business news to the data feed
 

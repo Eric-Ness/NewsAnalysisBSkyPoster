@@ -16,7 +16,7 @@ def get_news_feed_data():
     query = '''
     WITH TopSources AS (
         -- Get all items with the highest Source_Count value
-        SELECT URL, Title, Source_Count
+        SELECT URL, Title, Source_Count, News_Feed_ID
         FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
         WHERE Language_ID = 23
         AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
@@ -25,7 +25,7 @@ def get_news_feed_data():
     ),
     RemainingItems AS (
         -- Get items that don't have the highest Source_Count
-        SELECT URL, Title, Source_Count
+        SELECT URL, Title, Source_Count, News_Feed_ID
         FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
         WHERE Language_ID = 23
         AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
@@ -42,10 +42,10 @@ def get_news_feed_data():
     )
     -- Combine the two sets with top items first, then random selection from remaining
     SELECT * FROM (
-        SELECT URL, Title
+        SELECT URL, Title, News_Feed_ID
         FROM TopSources
         UNION ALL
-        SELECT TOP(160 - (SELECT COUNT(*) FROM TopSources)) URL, Title
+        SELECT TOP(160 - (SELECT COUNT(*) FROM TopSources)) URL, Title, News_Feed_ID
         FROM RemainingItems
         ORDER BY NEWID()
     ) AS Combined

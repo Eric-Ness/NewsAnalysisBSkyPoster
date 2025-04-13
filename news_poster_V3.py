@@ -1,6 +1,6 @@
 '''
-Version: 3.2
-Date: 2025-04-02
+Version: 3.3
+Date: 2025-04-13
 Author: Eric Ness (Updated Code)
 
 Description: This script is designed to be run as a scheduled task to automatically 
@@ -11,11 +11,14 @@ Updates in this version:
 - Added functionality to track previously posted URLs to avoid duplicates
 - Implemented URL storage in a text file for future reference
 - Added cleanup functionality for the URL history file
+- Added database update functionality to track posted content
 '''
 
 import logging
 import os
 import time
+import db
+import pyodbc  # Add import for SQL Server connection
 from dataclasses import dataclass
 from typing import Optional, List, Dict
 from datetime import datetime, timedelta
@@ -56,12 +59,14 @@ class ArticleContent:
         text (str): The full text of the article.
         summary (str): A summary of the article.
         top_image (str): The URL of the top image associated with the article.
+        news_feed_id (int, optional): The database ID of the news feed item.
     """
     url: str
     title: str
     text: str
     summary: str
     top_image: str
+    news_feed_id: Optional[int] = None
 
 @dataclass
 class FeedPost:
@@ -92,6 +97,7 @@ class NewsAnalyzer:
         5. Initializes the selected model.
         6. Initializes the AT Protocol client.
         7. Sets up the AT Protocol.
+        8. Initializes database connection.
         """
         # Load environment variables
         load_dotenv()
@@ -152,6 +158,9 @@ class NewsAnalyzer:
         # Initialize AT Protocol client
         self.at_client = Client()
         self._setup_at_protocol()
+        
+        # Initialize database connection
+        self._setup_database_connection()
 
     def _get_env_var(self, var_name: str) -> str:
         """Safely get environment variable or raise error if not found."""
@@ -169,6 +178,75 @@ class NewsAnalyzer:
         except Exception as e:
             logger.error(f"Failed to authenticate with AT Protocol: {e}")
             raise
+    
+    def _setup_database_connection(self):
+        """Set up connection to MSSQL database."""
+        try:
+            # Get database connection details from environment variables
+            server = str(os.getenv("server"))
+            db = str(os.getenv("db"))
+            user = str(os.getenv("user"))
+            pwd = str(os.getenv("pwd"))
+
+            # Define the connection string
+            connection_string = str('DRIVER={ODBC Driver 18 for SQL Server}; SERVER=' + server + 
+                                '; DATABASE=' + db + 
+                                '; UID=' + user + 
+                                '; PWD=' + pwd + 
+                                '; TrustServerCertificate=yes; MARS_Connection=yes;')
+            
+            # Create connection
+            self.db_conn = pyodbc.connect(connection_string)
+            logger.info("Successfully connected to database")
+        except Exception as e:
+            logger.error(f"Failed to connect to database: {e}")
+            # Not raising here to allow the script to continue without DB updates if needed
+            self.db_conn = None
+    
+    def _update_database(self, news_feed_id: int, article_text: str, bsky_tweet: str, article_url: str, article_img: str) -> bool:
+        """Update database with article information after posting to BSky.
+        
+        Args:
+            news_feed_id (int): The ID of the news feed item in the database.
+            article_text (str): The full text of the article.
+            bsky_tweet (str): The tweet text posted to BSky.
+            
+        Returns:
+            bool: True if database update was successful, False otherwise.
+        """
+        if not self.db_conn:
+            logger.error("No database connection available for update")
+            return False
+        
+        try:
+            cursor = self.db_conn.cursor()
+
+            # Prepare the update SQL query
+            sql = """
+            UPDATE [dbo].[tbl_News_Feed]
+            SET [Article_Text] = ?,
+                [Used_In_BSky] = 1,
+                [BSky_Tweet] = ?,
+                [Article_URL] = ?,
+                [Article_Img] = ?
+            WHERE [News_Feed_ID] = ?
+            """
+            
+            # Execute the update query
+            cursor.execute(sql, (article_text, bsky_tweet, article_url, article_img, news_feed_id))
+            self.db_conn.commit()
+            
+            logger.info(f"Successfully updated database for news_feed_id: {news_feed_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating database: {e}")
+            # Try to rollback if possible
+            try:
+                self.db_conn.rollback()
+            except Exception:
+                pass
+            return False
     
     def _get_posted_urls(self) -> List[str]:
         """Get list of previously posted URLs from the history file."""
@@ -384,6 +462,313 @@ class NewsAnalyzer:
             logger.error(f"Error fetching article: {e}")
             return None
 
+    def get_recent_posts(self, limit: int = 30) -> List[FeedPost]:
+        """
+        Fetches recent posts from the AT Protocol feed.
+
+        Args:
+            limit (int): The maximum number of posts to fetch. Defaults to 30.
+
+        Returns:
+            List[FeedPost]: A list of FeedPost objects representing the recent posts.
+
+        Raises:
+            Exception: If there is an error fetching the recent posts.
+        """
+        try:
+            profile = self.at_client.get_profile(self._get_env_var("AT_PROTOCOL_USERNAME"))
+            feed = self.at_client.get_author_feed(profile.did, limit=limit)
+            
+            posts = []
+            for post in feed.feed:
+                url = None
+                title = None
+                
+                # Extract embed data if available
+                if hasattr(post.post, 'embed') and post.post.embed:
+                    if hasattr(post.post.embed, 'external'):
+                        url = post.post.embed.external.uri
+                        title = post.post.embed.external.title
+
+                # Extract timestamp from indexed_at field
+                timestamp = None
+                if hasattr(post.post, 'indexed_at'):
+                    timestamp = datetime.fromisoformat(post.post.indexed_at.replace('Z', '+00:00'))
+                else:
+                    logger.warning(f"No timestamp found for post, using current time")
+                    timestamp = datetime.now()
+
+                # Extract text from record if available
+                text = ""
+                if hasattr(post.post, 'record') and hasattr(post.post.record, 'text'):
+                    text = post.post.record.text
+                elif hasattr(post.post, 'text'):
+                    text = post.post.text
+
+                posts.append(FeedPost(
+                    text=text,
+                    url=url,
+                    title=title,
+                    timestamp=timestamp
+                ))
+            
+            return posts
+
+        except Exception as e:
+            logger.error(f"Error fetching recent posts: {e}")
+            return []
+
+    def select_news_article(self, candidates, recent_posts: List[FeedPost]) -> Optional[Dict]:
+        """
+        Selects the most newsworthy article from a list of candidates based on certain criteria.
+
+        Args:
+            candidates (list or DataFrame): A list or DataFrame of candidate articles.
+            recent_posts (list): A list of recent feed posts.
+
+        Returns:
+            dict or None: A dictionary containing the URL, title, and news_feed_id of the selected article, or None if no article is selected.
+
+        Raises:
+            Exception: If there is an error processing the candidates or getting the article selection from the model.
+        """
+        try:
+            # Generate a string of recent post titles
+            recent_titles = "\n".join([
+                f"- {post.title}" for post in recent_posts if post.title
+            ])
+
+            candidate_list = []
+            
+            # Log information about what we received
+            logger.info(f"Received candidates of type: {type(candidates)}")
+            if hasattr(candidates, "__len__"):
+                logger.info(f"Number of candidates: {len(candidates)}")
+            
+            # Debug the first candidate if available
+            if hasattr(candidates, "__getitem__") and len(candidates) > 0:
+                first_item = candidates[0]
+                logger.info(f"First candidate type: {type(first_item)}")
+                if hasattr(first_item, "__dict__"):
+                    logger.info(f"First candidate attributes: {first_item.__dict__}")
+                else:
+                    logger.info(f"First candidate: {first_item}")
+            
+            try:
+                # Check if candidates is a pandas DataFrame
+                if hasattr(candidates, 'itertuples'):
+                    logger.info("Processing candidates as DataFrame")
+                    for row in candidates.itertuples():
+                        if hasattr(row, 'URL') and hasattr(row, 'Title') and hasattr(row, 'News_Feed_ID'):
+                            candidate_list.append({
+                                'URL': getattr(row, 'URL'),
+                                'Title': getattr(row, 'Title'),
+                                'News_Feed_ID': getattr(row, 'News_Feed_ID')
+                            })
+                # Check if it's a list or list-like
+                elif hasattr(candidates, '__iter__'):
+                    logger.info("Processing candidates as a list or iterable")
+                    for item in candidates:
+                        # Process dictionary format
+                        if isinstance(item, dict):
+                            # Try standard capitalized keys
+                            if 'URL' in item and 'Title' in item and 'News_Feed_ID' in item:
+                                candidate_list.append({
+                                    'URL': item['URL'],
+                                    'Title': item['Title'],
+                                    'News_Feed_ID': item['News_Feed_ID']
+                                })
+                            # Try lowercase keys
+                            elif 'url' in item and 'title' in item and 'news_feed_id' in item:
+                                candidate_list.append({
+                                    'URL': item['url'],
+                                    'Title': item['title'],
+                                    'News_Feed_ID': item['news_feed_id']
+                                })
+                            # Try numbered keys (for objects with numeric keys)
+                            elif '0' in item and '1' in item and '2' in item:
+                                candidate_list.append({
+                                    'URL': item['0'],
+                                    'Title': item['1'],
+                                    'News_Feed_ID': item['2']
+                                })
+                        # Process tuple-like format (list, tuple)
+                        elif hasattr(item, '__getitem__') and len(item) >= 3:
+                            # Handle both tuple-like objects and objects with numeric indices
+                            try:
+                                url = item[0]
+                                title = item[1]
+                                news_feed_id = item[2]
+                                candidate_list.append({
+                                    'URL': url,
+                                    'Title': title,
+                                    'News_Feed_ID': news_feed_id
+                                })
+                            except (IndexError, TypeError) as e:
+                                logger.warning(f"Could not extract tuple fields from {item}: {e}")
+                        # Try to extract fields from object attributes
+                        elif hasattr(item, '__dict__') or hasattr(item, '__slots__'):
+                            # Get all attributes
+                            attrs = {}
+                            if hasattr(item, '__dict__'):
+                                attrs.update(item.__dict__)
+                            if hasattr(item, '__slots__'):
+                                for slot in item.__slots__:
+                                    if hasattr(item, slot):
+                                        attrs[slot] = getattr(item, slot)
+                            
+                            # Try to find URL-like attribute
+                            url = None
+                            for attr_name in ['URL', 'url', 'link', 'href']:
+                                if attr_name in attrs:
+                                    url = attrs[attr_name]
+                                    break
+                            
+                            # Try to find title-like attribute
+                            title = None
+                            for attr_name in ['Title', 'title', 'name', 'headline']:
+                                if attr_name in attrs:
+                                    title = attrs[attr_name]
+                                    break
+                            
+                            # Try to find ID-like attribute
+                            news_feed_id = None
+                            for attr_name in ['News_Feed_ID', 'news_feed_id', 'id', 'ID', 'news_id', 'newsId', 'feed_id']:
+                                if attr_name in attrs:
+                                    news_feed_id = attrs[attr_name]
+                                    break
+                            
+                            if url and title and news_feed_id:
+                                candidate_list.append({
+                                    'URL': url,
+                                    'Title': title,
+                                    'News_Feed_ID': news_feed_id
+                                })
+                            else:
+                                logger.debug(f"Could not extract all required fields from object attributes: {attrs}")
+                
+                # Log what we found
+                logger.info(f"Successfully processed {len(candidate_list)} valid candidates")
+                if len(candidate_list) > 0:
+                    logger.info(f"First processed candidate: {candidate_list[0]}")
+                
+            except Exception as e:
+                logger.error(f"Error processing candidates: {e}", exc_info=True)
+                raise
+
+            # If no candidates were processed, see if we can extract directly as an array
+            if not candidate_list and hasattr(candidates, '__getitem__') and len(candidates) > 0:
+                logger.info("Trying to process candidates as a direct array")
+                try:
+                    # Try to extract as a simple array with structure [URL, Title, News_Feed_ID, ...]
+                    if len(candidates) >= 3:
+                        url = candidates[0]
+                        title = candidates[1]
+                        news_feed_id = candidates[2]
+                        
+                        if all(isinstance(x, str) for x in [url, title]) and news_feed_id is not None:
+                            logger.info(f"Extracted single candidate from array: URL={url}, Title={title}, ID={news_feed_id}")
+                            candidate_list.append({
+                                'URL': url,
+                                'Title': title,
+                                'News_Feed_ID': news_feed_id
+                            })
+                except Exception as e:
+                    logger.warning(f"Could not process as direct array: {e}")
+
+            # If still no candidates, try to get more debug info
+            if not candidate_list:
+                logger.error("No valid candidates found after processing")
+                if hasattr(candidates, "__len__") and len(candidates) > 0:
+                    sample = candidates[0]
+                    logger.error(f"Debug - Sample candidate: {sample}")
+                    if hasattr(sample, "__dict__"):
+                        logger.error(f"Debug - Sample candidate attributes: {sample.__dict__}")
+                    elif isinstance(sample, dict):
+                        logger.error(f"Debug - Sample candidate keys: {sample.keys()}")
+                return None
+
+            # Randomize the candidate list
+            import random
+            random.shuffle(candidate_list)
+
+            # Take up to 30 items from the randomized list
+            candidate_list = candidate_list[:30]
+
+            # Generate a string of candidate titles and URLs
+            candidate_titles = "\n".join([
+                f"- {item['Title']} ({item['URL']})" for item in candidate_list
+            ])
+
+            # Create a prompt for selecting the most newsworthy article
+            prompt = f"""Select the single most newsworthy article that:
+    1. Has significant public interest or impact
+    2. Represents meaningful developments rather than speculation
+    3. Avoids sensationalism and clickbait
+
+    Recent posts:
+    {recent_titles}
+
+    Candidates:
+    {candidate_titles}
+
+    Return ONLY the URL and Title in this format:
+    URL: [selected URL]
+    TITLE: [selected title]"""
+
+            try:
+                # Generate content using the model
+                response = self.model.generate_content(prompt)
+                response_text = response.text
+
+                # Extract the URL and title from the model response
+                url_line = [line for line in response_text.split('\n') if line.startswith('URL:')]
+                title_line = [line for line in response_text.split('\n') if line.startswith('TITLE:')]
+
+                if url_line and title_line:
+                    selected_url = url_line[0].replace('URL:', '').strip()
+                    selected_title = title_line[0].replace('TITLE:', '').strip()
+                    
+                    # Find the corresponding News_Feed_ID
+                    selected_item = next(
+                        (item for item in candidate_list if item['URL'] == selected_url),
+                        None
+                    )
+                    
+                    if selected_item:
+                        return {
+                            'URL': selected_url,
+                            'Title': selected_title,
+                            'News_Feed_ID': selected_item['News_Feed_ID']
+                        }
+
+                # If the response cannot be parsed correctly, select the first candidate
+                if candidate_list:
+                    logger.warning("Couldn't parse model response, selecting first candidate")
+                    return {
+                        'URL': candidate_list[0]['URL'],
+                        'Title': candidate_list[0]['Title'],
+                        'News_Feed_ID': candidate_list[0]['News_Feed_ID']
+                    }
+
+                return None
+
+            except Exception as e:
+                logger.error(f"Error getting article selection from model: {e}")
+                # Fallback to first item if there's an error
+                if candidate_list:
+                    logger.warning("Model error, selecting first candidate")
+                    return {
+                        'URL': candidate_list[0]['URL'],
+                        'Title': candidate_list[0]['Title'],
+                        'News_Feed_ID': candidate_list[0]['News_Feed_ID']
+                    }
+                return None
+
+        except Exception as e:
+            logger.error(f"Error selecting news article: {e}", exc_info=True)
+            return None
+
     def generate_tweet(self, article_text: str) -> Optional[Dict]:
         """Generate a tweet summary using Google's Gemini model.
         Returns a dictionary containing the tweet text and facets for hashtag formatting.
@@ -522,9 +907,8 @@ class NewsAnalyzer:
             logger.error(f"Error generating tweet: {e}")
             return None
 
-
     def post_to_social(self, tweet_data: Dict, article: ArticleContent) -> bool:
-        """Post the article summary to AT Protocol with proper hashtag formatting.
+        """Post the article summary to AT Protocol with proper hashtag formatting and update database.
 
         Args:
             tweet_data (Dict): A dictionary containing the tweet data, including the text and facets.
@@ -534,6 +918,10 @@ class NewsAnalyzer:
             bool: True if the article was successfully posted to social media, False otherwise.
         """
         try:
+            # Log information about the article we're posting
+            logger.info(f"Posting article: {article.title}")
+            logger.info(f"Article news_feed_id: {article.news_feed_id}")
+            
             response = requests.get(article.top_image)
             img_data = response.content
             upload = self.at_client.com.atproto.repo.upload_blob(img_data)
@@ -547,176 +935,54 @@ class NewsAnalyzer:
                 )
             )
 
+            # Post to Bluesky
             self.at_client.send_post(
                 text=tweet_data["text"],
                 facets=tweet_data["facets"],
                 embed=embed_external
             )
             
+            logger.info("Successfully posted to Bluesky")
+            
             # Add the URL to our history file
             self._add_url_to_history(article.url)
+            
+            # Make sure news_feed_id is properly converted to an integer
+            news_feed_id = None
+            if article.news_feed_id is not None:
+                try:
+                    news_feed_id = int(article.news_feed_id)
+                    logger.info(f"Converted news_feed_id to int: {news_feed_id}")
+                except (ValueError, TypeError) as e:
+                    logger.error(f"Could not convert news_feed_id to integer: {article.news_feed_id}, Error: {e}")
+            
+            # Update database if we have a valid news_feed_id
+            if news_feed_id is not None:
+                # Ensure article text and tweet are strings
+                article_text = str(article.text) if article.text is not None else ""
+                bsky_tweet = str(tweet_data["text"]) if tweet_data["text"] is not None else ""
+                
+                logger.info(f"Calling database update with news_feed_id={news_feed_id}")
+                update_result = self._update_database(
+                    news_feed_id=news_feed_id,
+                    article_text=article_text,
+                    bsky_tweet=bsky_tweet,
+                    article_url=article.url,
+                    article_img=article.top_image
+                )
+                
+                if update_result:
+                    logger.info(f"Database update successful for news_feed_id: {news_feed_id}")
+                else:
+                    logger.error(f"Database update failed for news_feed_id: {news_feed_id}")
+            else:
+                logger.warning("No valid news_feed_id provided, skipping database update")
             
             return True
 
         except Exception as e:
-            logger.error(f"Error posting to social media: {e}")
+            logger.error(f"Error posting to social media: {e}", exc_info=True)
             return False
-
-    def get_recent_posts(self, limit: int = 30) -> List[FeedPost]:
-        """
-        Fetches recent posts from the AT Protocol feed.
-
-        Args:
-            limit (int): The maximum number of posts to fetch. Defaults to 30.
-
-        Returns:
-            List[FeedPost]: A list of FeedPost objects representing the recent posts.
-
-        Raises:
-            Exception: If there is an error fetching the recent posts.
-        """
-        try:
-            profile = self.at_client.get_profile(self._get_env_var("AT_PROTOCOL_USERNAME"))
-            feed = self.at_client.get_author_feed(profile.did, limit=limit)
-            
-            posts = []
-            for post in feed.feed:
-                url = None
-                title = None
-                
-                # Extract embed data if available
-                if hasattr(post.post, 'embed') and post.post.embed:
-                    if hasattr(post.post.embed, 'external'):
-                        url = post.post.embed.external.uri
-                        title = post.post.embed.external.title
-
-                # Extract timestamp from indexed_at field
-                timestamp = None
-                if hasattr(post.post, 'indexed_at'):
-                    timestamp = datetime.fromisoformat(post.post.indexed_at.replace('Z', '+00:00'))
-                else:
-                    logger.warning(f"No timestamp found for post, using current time")
-                    timestamp = datetime.now()
-
-                # Extract text from record if available
-                text = ""
-                if hasattr(post.post, 'record') and hasattr(post.post.record, 'text'):
-                    text = post.post.record.text
-                elif hasattr(post.post, 'text'):
-                    text = post.post.text
-
-                posts.append(FeedPost(
-                    text=text,
-                    url=url,
-                    title=title,
-                    timestamp=timestamp
-                ))
-            
-            return posts
-
-        except Exception as e:
-            logger.error(f"Error fetching recent posts: {e}")
-            return []
-
-    def select_news_article(self, candidates, recent_posts: List[FeedPost]) -> Optional[Dict]:
-        """
-        Selects the most newsworthy article from a list of candidates based on certain criteria.
-
-        Args:
-            candidates (list): A list of candidate articles.
-            recent_posts (list): A list of recent feed posts.
-
-        Returns:
-            dict or None: A dictionary containing the URL and title of the selected article, or None if no article is selected.
-
-        Raises:
-            Exception: If there is an error processing the candidates or getting the article selection from the model.
-        """
-        try:
-            # Generate a string of recent post titles
-            recent_titles = "\n".join([
-                f"- {post.title}" for post in recent_posts if post.title
-            ])
-
-            candidate_list = []
-            try:
-                # Process the candidates and create a list of dictionaries with URL and Title
-                for row in candidates:
-                    if hasattr(row, 'URL') and hasattr(row, 'Title'):
-                        candidate_list.append({
-                            'URL': getattr(row, 'URL'),
-                            'Title': getattr(row, 'Title')
-                        })
-                    elif isinstance(row, (tuple, list)):
-                        candidate_list.append({
-                            'URL': row[0],
-                            'Title': row[1]
-                        })
-            except Exception as e:
-                logger.error(f"Error processing candidates: {e}")
-                raise
-
-            # Randomize the candidate list
-            import random
-            random.shuffle(candidate_list)
-
-            # Take up to 30 items from the randomized list
-            candidate_list = candidate_list[:30]
-
-            # Generate a string of candidate titles and URLs
-            candidate_titles = "\n".join([
-                f"- {item['Title']} ({item['URL']})" for item in candidate_list
-            ])
-
-            # Create a prompt for selecting the most newsworthy article
-            prompt = f"""Select the single most newsworthy article that:
-    1. Has significant public interest or impact
-    2. Represents meaningful developments rather than speculation
-    3. Avoids sensationalism and clickbait
-
-    Recent posts:
-    {recent_titles}
-
-    Candidates:
-    {candidate_titles}
-
-    Return ONLY the URL and Title in this format:
-    URL: [selected URL]
-    TITLE: [selected title]"""
-
-            try:
-                # Generate content using the model
-                response = self.model.generate_content(prompt)
-                response_text = response.text
-
-                # Extract the URL and title from the model response
-                url_line = [line for line in response_text.split('\n') if line.startswith('URL:')]
-                title_line = [line for line in response_text.split('\n') if line.startswith('TITLE:')]
-
-                if url_line and title_line:
-                    return {
-                        'URL': url_line[0].replace('URL:', '').strip(),
-                        'Title': title_line[0].replace('TITLE:', '').strip()
-                    }
-
-                # If the response cannot be parsed correctly, select the first candidate
-                if candidate_list:
-                    logger.warning("Couldn't parse model response, selecting first candidate")
-                    return candidate_list[0]
-
-                return None
-
-            except Exception as e:
-                logger.error(f"Error getting article selection from model: {e}")
-                # Fallback to first item if there's an error
-                if candidate_list:
-                    logger.warning("Model error, selecting first candidate")
-                    return candidate_list[0]
-                return None
-
-        except Exception as e:
-            logger.error(f"Error selecting news article: {e}")
-            return None
 
     def process_news_feed_v2(self, news_feed_data: pd.DataFrame) -> bool:
         """Enhanced version of process_news_feed with consistent similarity checking and proper hashtag formatting.
@@ -741,6 +1007,7 @@ class NewsAnalyzer:
                 return False
 
             logger.info(f"Selected article: {selected['Title']}")
+            logger.info(f"Selected News_Feed_ID: {selected['News_Feed_ID']}")
 
             # Get real URL
             real_url = self.get_real_url(selected['URL'])
@@ -768,6 +1035,9 @@ class NewsAnalyzer:
             article = self.fetch_article(real_url)
             if not article:
                 return False
+                
+            # Set the news_feed_id in the article object
+            article.news_feed_id = selected['News_Feed_ID']
 
             # Check for content similarity
             is_similar = self.check_content_similarity(article.title, article.text, recent_posts)
@@ -824,6 +1094,14 @@ def main():
                 logger.info(f"Waiting {retry_delay} seconds before next attempt...")
                 time.sleep(retry_delay)
                 continue
+        finally:
+            # Close database connection if it exists
+            if hasattr(analyzer, 'db_conn') and analyzer.db_conn:
+                try:
+                    analyzer.db_conn.close()
+                    logger.info("Database connection closed")
+                except Exception as e:
+                    logger.error(f"Error closing database connection: {e}")
     
     logger.error(f"Failed to process news feed after {max_retries} attempts")
 
