@@ -81,7 +81,8 @@ PAYWALL_DOMAINS = [
     "barrons.com",     # Barron's
     "forbes.com",      # Forbes (sometimes)
     "businessinsider.com", # Business Insider Prime
-    "insider.com"      # Insider
+    "insider.com",     # Insider
+    "buzzfeed.com" # BuzzFeed (sometimes)
 ]
 
 # Function to validate settings
