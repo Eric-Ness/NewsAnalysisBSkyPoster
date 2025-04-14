@@ -106,11 +106,9 @@ The application is configured through environment variables. Copy `.env.example`
 
 - Eric Ness
 
-## License
+## Change Log
 
-This project is proprietary and confidential.
-
-## Acknowledgments
-
-- Google's Generative AI for powering the article selection and content generation
-- AT Protocol for the BlueSky social network API 
+2025.04.14 - Major restructure, no longer a monolith py file.  
+2025.04.13 - Keep track bsky posts, extracted article text, and pertinent URLs.  
+2025.04.11 - Increased amount of news LLM could choose from 120 to 160 news items.  
+2025.04.10 - Added business news to the data feed
