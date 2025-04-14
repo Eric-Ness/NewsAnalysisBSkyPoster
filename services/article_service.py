@@ -106,6 +106,11 @@ class ArticleService:
         Returns:
             Optional[ArticleContent]: The parsed article content, or None if there was an error.
         """
+        # First check if URL is from a paywall domain and skip it entirely
+        if any(domain in url for domain in self.paywall_domains):
+            logger.warning(f"Skipping paywall domain article: {url}")
+            return None
+            
         try:
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -129,7 +134,7 @@ class ArticleService:
                 # Check for paywall indicators
                 if any(phrase in article.html.lower() for phrase in settings.PAYWALL_PHRASES):
                     logger.warning(f"Paywall detected for {url}")
-                    return self._fetch_with_selenium(url, news_feed_id)
+                    return None
                 
                 logger.warning(f"Article content too short: {len(article.text.split()) if article.text else 0} words")
                 return None
@@ -146,10 +151,6 @@ class ArticleService:
 
         except Exception as e:
             logger.error(f"Error fetching article: {e} on URL {url}")
-            # Try with Selenium if it's a known paywall domain
-            if any(domain in url for domain in self.paywall_domains):
-                logger.info(f"Known paywall domain detected: {url}. Attempting Selenium extraction.")
-                return self._fetch_with_selenium(url, news_feed_id)
             return None
     
     def _fetch_with_selenium(self, url: str, news_feed_id: Optional[int] = None) -> Optional[ArticleContent]:

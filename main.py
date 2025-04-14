@@ -69,6 +69,20 @@ class NewsPoster:
                     'News_Feed_ID': row['News_Feed_ID']
                 })
             
+            # Filter out articles from paywall domains
+            filtered_candidates = []
+            for candidate in news_candidates:
+                if not any(domain in candidate['URL'] for domain in settings.PAYWALL_DOMAINS):
+                    filtered_candidates.append(candidate)
+                else:
+                    logger.info(f"Filtering out paywall domain article: {candidate['Title']} ({candidate['URL']})")
+            
+            # Log how many candidates were filtered out
+            if len(news_candidates) != len(filtered_candidates):
+                logger.info(f"Filtered out {len(news_candidates) - len(filtered_candidates)} paywall domain articles from {len(news_candidates)} total candidates")
+            
+            news_candidates = filtered_candidates
+            
             # 2. Get recent posts to avoid duplicates
             recent_posts = self.social_service.get_recent_posts()
             
@@ -92,6 +106,11 @@ class NewsPoster:
                     real_url = self.article_service.get_real_url(selected_article['URL'])
                     if real_url:
                         selected_article['URL'] = real_url
+                        
+                        # Check if resolved URL is from a paywall domain
+                        if any(domain in selected_article['URL'] for domain in settings.PAYWALL_DOMAINS):
+                            logger.warning(f"Resolved URL is from paywall domain: {selected_article['URL']}")
+                            continue
                 
                 # 6. Fetch the selected article content
                 article_content = self.article_service.fetch_article(
