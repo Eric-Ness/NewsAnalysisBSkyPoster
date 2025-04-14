@@ -102,10 +102,6 @@ The application is configured through environment variables. Copy `.env.example`
 - `AT_PROTOCOL_PASSWORD`: Your BlueSky password
 - Database configuration: `server`, `db`, `user`, `pwd`
 
-## Author
-
-- Eric Ness
-
 ## Change Log
 
 2025.04.14 - Major restructure, no longer a monolith py file.  
