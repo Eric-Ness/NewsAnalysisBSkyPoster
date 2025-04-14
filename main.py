@@ -6,6 +6,7 @@ It fetches news articles, selects the most newsworthy one,
 and posts it to the AT Protocol (BlueSky) feed.
 
 Author: Eric Ness
+Version: 4.0
 """
 
 import sys

@@ -95,50 +95,44 @@ class DatabaseConnection:
         Returns:
             Optional[pd.DataFrame]: DataFrame containing news feed data, or None if an error occurred.
         """
-        query = """
-        SELECT TOP 100 News_Feed_ID, Title, URL
-        FROM tbl_News_Feed
-        WHERE Used_In_BSky = 0
-        ORDER BY News_Feed_ID DESC
-        """
-
+        # SQL query to retrieve news feed data
         query = """
         WITH TopSources AS (
-        -- Get all items with the highest Source_Count value
-        SELECT URL, Title, Source_Count, News_Feed_ID
-        FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
-        WHERE Language_ID = 23
-        AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
-        AND [Published_Date] >= DATEADD(day, -1, GETDATE())
-        AND Source_Count > 1
-    ),
-    RemainingItems AS (
-        -- Get items that don't have the highest Source_Count
-        SELECT URL, Title, Source_Count, News_Feed_ID
-        FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
-        WHERE Language_ID = 23
-        AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
-        AND [Published_Date] >= DATEADD(day, -1, GETDATE())
-        AND Source_Count > 0
-        AND Source_Count < (
-            SELECT MAX(Source_Count)
+            -- Get all items with the highest Source_Count value
+            SELECT URL, Title, Source_Count, News_Feed_ID
+            FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
+            WHERE Language_ID = 23
+            AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
+            AND [Published_Date] >= DATEADD(day, -1, GETDATE())
+            AND Source_Count > 1
+        ),
+        RemainingItems AS (
+            -- Get items that don't have the highest Source_Count
+            SELECT URL, Title, Source_Count, News_Feed_ID
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
             AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 0
+            AND Source_Count < (
+                SELECT MAX(Source_Count)
+                FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
+                WHERE Language_ID = 23
+                AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
+                AND [Published_Date] >= DATEADD(day, -1, GETDATE())
+                AND Source_Count > 0
+            )
         )
-    )
-    -- Combine the two sets with top items first, then random selection from remaining
-    SELECT * FROM (
-        SELECT News_Feed_ID, Title, URL
-        FROM TopSources
-        UNION ALL
-        SELECT TOP(160 - (SELECT COUNT(*) FROM TopSources)) News_Feed_ID, Title, URL
-        FROM RemainingItems
-        ORDER BY NEWID()
-    ) AS Combined
-    ORDER BY  NEWID();
+        -- Combine the two sets with top items first, then random selection from remaining
+        SELECT * FROM (
+            SELECT News_Feed_ID, Title, URL
+            FROM TopSources
+            UNION ALL
+            SELECT TOP(160 - (SELECT COUNT(*) FROM TopSources)) News_Feed_ID, Title, URL
+            FROM RemainingItems
+            ORDER BY NEWID()
+        ) AS Combined
+        ORDER BY  NEWID();
         """
         
         try:
