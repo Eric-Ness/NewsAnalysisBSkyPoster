@@ -51,12 +51,12 @@ class SocialService:
             logger.error(f"Failed to authenticate with AT Protocol: {e}")
             return False
     
-    def get_recent_posts(self, limit: int = 30) -> List[FeedPost]:
+    def get_recent_posts(self, limit: int = 60) -> List[FeedPost]:
         """
         Fetches recent posts from the AT Protocol feed.
 
         Args:
-            limit (int): The maximum number of posts to fetch. Defaults to 30.
+            limit (int): The maximum number of posts to fetch. Defaults to 60.
 
         Returns:
             List[FeedPost]: A list of FeedPost objects representing the recent posts.
