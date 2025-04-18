@@ -83,7 +83,8 @@ PAYWALL_DOMAINS = [
     "businessinsider.com", # Business Insider Prime
     "insider.com",     # Insider
     "buzzfeed.com",    # BuzzFeed (sometimes)
-    "understandingwar.org" # Institute for the Study of War
+    "understandingwar.org", # Institute for the Study of War
+    "federalreserve.gov"
 ]
 
 # Function to validate settings
