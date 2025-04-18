@@ -14,6 +14,7 @@ import argparse
 import logging
 import pandas as pd
 from typing import Optional, List, Dict, Any
+from urllib.parse import urlparse
 
 from config import settings
 from utils.logger import get_logger, setup_file_logging
@@ -72,10 +73,26 @@ class NewsPoster:
             # Filter out articles from paywall domains
             filtered_candidates = []
             for candidate in news_candidates:
-                if not any(domain in candidate['URL'] for domain in settings.PAYWALL_DOMAINS):
+                url = candidate['URL']
+                # Extract domain from URL to check against paywall domains
+                try:
+                    parsed_url = urlparse(url)
+                    domain = parsed_url.netloc
+                    # Extract base domain (e.g., example.com from sub.example.com)
+                    domain_parts = domain.split('.')
+                    if len(domain_parts) > 1:
+                        base_domain = '.'.join(domain_parts[-2:])
+                    else:
+                        base_domain = domain
+                        
+                    if not any(paywall_domain == base_domain for paywall_domain in settings.PAYWALL_DOMAINS):
+                        filtered_candidates.append(candidate)
+                    else:
+                        logger.info(f"Filtering out paywall domain article: {candidate['Title']} ({url}) - matched domain: {base_domain}")
+                except Exception as e:
+                    logger.warning(f"Error parsing URL {url}: {e} - skipping domain check")
+                    # If we can't parse the URL, still include the candidate
                     filtered_candidates.append(candidate)
-                else:
-                    logger.info(f"Filtering out paywall domain article: {candidate['Title']} ({candidate['URL']})")
             
             # Log how many candidates were filtered out
             if len(news_candidates) != len(filtered_candidates):
@@ -108,9 +125,21 @@ class NewsPoster:
                         selected_article['URL'] = real_url
                         
                         # Check if resolved URL is from a paywall domain
-                        if any(domain in selected_article['URL'] for domain in settings.PAYWALL_DOMAINS):
-                            logger.warning(f"Resolved URL is from paywall domain: {selected_article['URL']}")
-                            continue
+                        try:
+                            parsed_url = urlparse(real_url)
+                            domain = parsed_url.netloc
+                            # Extract base domain
+                            domain_parts = domain.split('.')
+                            if len(domain_parts) > 1:
+                                base_domain = '.'.join(domain_parts[-2:])
+                            else:
+                                base_domain = domain
+                                
+                            if any(paywall_domain == base_domain for paywall_domain in settings.PAYWALL_DOMAINS):
+                                logger.warning(f"Resolved URL is from paywall domain: {real_url} - matched domain: {base_domain}")
+                                continue
+                        except Exception as e:
+                            logger.warning(f"Error parsing resolved URL {real_url}: {e}")
                 
                 # 6. Fetch the selected article content
                 article_content = self.article_service.fetch_article(

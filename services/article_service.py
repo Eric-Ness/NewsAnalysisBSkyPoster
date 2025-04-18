@@ -107,9 +107,23 @@ class ArticleService:
             Optional[ArticleContent]: The parsed article content, or None if there was an error.
         """
         # First check if URL is from a paywall domain and skip it entirely
-        if any(domain in url for domain in self.paywall_domains):
-            logger.warning(f"Skipping paywall domain article: {url}")
-            return None
+        try:
+            from urllib.parse import urlparse
+            parsed_url = urlparse(url)
+            domain = parsed_url.netloc
+            # Extract base domain
+            domain_parts = domain.split('.')
+            if len(domain_parts) > 1:
+                base_domain = '.'.join(domain_parts[-2:])
+            else:
+                base_domain = domain
+                
+            if any(paywall_domain == base_domain for paywall_domain in self.paywall_domains):
+                logger.warning(f"Skipping paywall domain article: {url} - matched domain: {base_domain}")
+                return None
+        except Exception as e:
+            logger.warning(f"Error parsing URL {url} for paywall check: {e}")
+            # Continue with the fetch attempt even if we can't check the domain
             
         try:
             headers = {
