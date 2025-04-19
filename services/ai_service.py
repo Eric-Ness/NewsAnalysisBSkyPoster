@@ -10,8 +10,10 @@ import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
+import re
 
 import google.generativeai as genai
+from atproto import models
 
 from config import settings
 from utils.logger import get_logger
@@ -96,7 +98,6 @@ class AIService:
             
             # Add basic keyword matching as a pre-filter
             # Extract important keywords from title (simple approach)
-            import re
             title_words = set(re.sub(r'[^\w\s]', '', article_title.lower()).split())
             title_words = {w for w in title_words if len(w) > 3}  # Only keep meaningful words
             
@@ -210,7 +211,6 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
                 selected_articles = []
                 
                 # Regular expression to extract numbered items with URL and TITLE
-                import re
                 pattern = r'(\d+)\.\s+URL:\s+(.*?)\s+TITLE:\s+(.*?)(?=\n\d+\.|\Z)'
                 matches = re.findall(pattern, response_text, re.DOTALL)
                 
@@ -277,9 +277,9 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
         articles = self.select_news_articles(candidates, recent_posts, max_count=1)
         return articles[0] if articles else None
     
-    def generate_tweet(self, article_text: str, article_title: str, article_url: str) -> Optional[Dict[str, str]]:
+    def generate_tweet(self, article_text: str, article_title: str, article_url: str) -> Optional[Dict[str, Any]]:
         """
-        Generate a tweet-like post for an article using AI.
+        Generate a tweet-like post for an article using AI, including hashtags and facets.
         
         Args:
             article_text: The full text of the article
@@ -287,7 +287,7 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
             article_url: The URL of the article
             
         Returns:
-            Optional[Dict]: Dictionary with tweet text and summary, or None if generation failed
+            Optional[Dict]: Dictionary with tweet text, summary, and facets for hashtag formatting
         """
         try:
             # Limit article text to reduce token usage
@@ -302,32 +302,96 @@ Article Content: {truncated_text}
 Requirements:
 1. Be factual and objective - no editorializing or opinions
 2. Include the most important information only (who, what, where, when)
-3. No hashtags or emojis
-4. Keep it under 280 characters
-5. Use neutral, straightforward language
+3. Keep it under 260 characters (excluding hashtags)
+4. Use neutral, straightforward language
+5. Add ONE relevant hashtag at the end that best represents the subject or category
 
 Format your response as:
 TWEET: [your tweet text]
+HASHTAG: [one relevant hashtag without the # symbol]
 SUMMARY: [one sentence summary of the article]"""
 
             response = self.model.generate_content(prompt)
             response_text = response.text
             
+            # Extract the components from the response
             tweet_line = [line for line in response_text.split('\n') if line.startswith('TWEET:')]
+            hashtag_line = [line for line in response_text.split('\n') if line.startswith('HASHTAG:')]
             summary_line = [line for line in response_text.split('\n') if line.startswith('SUMMARY:')]
             
-            if tweet_line and summary_line:
-                tweet_text = tweet_line[0].replace('TWEET:', '').strip()
-                summary_text = summary_line[0].replace('SUMMARY:', '').strip()
+            if not tweet_line:
+                logger.warning("No tweet text found in AI response")
+                return None
                 
-                return {
-                    'tweet_text': tweet_text,
-                    'summary': summary_text
-                }
-                
-            logger.warning(f"Could not parse AI response for tweet generation: {response_text[:100]}...")
-            return None
+            tweet_text = tweet_line[0].replace('TWEET:', '').strip()
             
+            # Extract the generated hashtag
+            generated_hashtag = None
+            if hashtag_line:
+                generated_hashtag = hashtag_line[0].replace('HASHTAG:', '').strip()
+                # Remove # if it was included
+                if generated_hashtag.startswith('#'):
+                    generated_hashtag = generated_hashtag[1:]
+            
+            # If no hashtag was found or it's invalid, use a fallback
+            if not generated_hashtag or not re.match(r'^\w+$', generated_hashtag):
+                keywords = ["Update", "Breaking", "Latest", "Report"]
+                import random
+                generated_hashtag = random.choice(keywords)
+            
+            # Add hashtags with proper spacing
+            final_tweet = f"{tweet_text} #{generated_hashtag} #News"
+            
+            # Create facets for both hashtags
+            facets = []
+            
+            # Facet for the generated hashtag
+            generated_hashtag_start = len(tweet_text) + 1  # +1 for the space before hashtag
+            generated_hashtag_end = generated_hashtag_start + len(generated_hashtag) + 1  # +1 for the # symbol
+            
+            facets.append(
+                models.AppBskyRichtextFacet.Main(
+                    features=[
+                        models.AppBskyRichtextFacet.Tag(
+                            tag=generated_hashtag
+                        )
+                    ],
+                    index=models.AppBskyRichtextFacet.ByteSlice(
+                        byteStart=generated_hashtag_start,
+                        byteEnd=generated_hashtag_end
+                    )
+                )
+            )
+            
+            # Facet for the "#News" hashtag
+            news_hashtag_start = len(tweet_text) + len(generated_hashtag) + 3  # Space + # + tag + space
+            news_hashtag_end = news_hashtag_start + 5  # Length of "#News"
+            
+            facets.append(
+                models.AppBskyRichtextFacet.Main(
+                    features=[
+                        models.AppBskyRichtextFacet.Tag(
+                            tag="News"
+                        )
+                    ],
+                    index=models.AppBskyRichtextFacet.ByteSlice(
+                        byteStart=news_hashtag_start,
+                        byteEnd=news_hashtag_end
+                    )
+                )
+            )
+            
+            # Get summary if available
+            summary_text = ""
+            if summary_line:
+                summary_text = summary_line[0].replace('SUMMARY:', '').strip()
+            
+            return {
+                'tweet_text': final_tweet,
+                'summary': summary_text,
+                'facets': facets
+            }
+                
         except Exception as e:
             logger.error(f"Error generating tweet: {e}")
             return None 

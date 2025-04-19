@@ -177,7 +177,8 @@ class NewsPoster:
                         tweet_data['tweet_text'],
                         article_content.url,
                         article_content.title,
-                        article_content.top_image
+                        article_content.top_image,
+                        tweet_data.get('facets')
                     )
                     
                     if not posted:

@@ -106,7 +106,7 @@ class SocialService:
             return []
     
     def post_to_social(self, tweet_text: str, article_url: str, article_title: str, 
-                       article_image: Optional[str] = None) -> bool:
+                       article_image: Optional[str] = None, facets: Optional[List[Any]] = None) -> bool:
         """
         Post content to the AT Protocol feed.
         
@@ -115,6 +115,7 @@ class SocialService:
             article_url: The URL of the article
             article_title: The title of the article
             article_image: The URL of an image to include (optional)
+            facets: Rich text facets for formatting (optional)
             
         Returns:
             bool: True if the post was successful, False otherwise
@@ -144,7 +145,8 @@ class SocialService:
             # Post to Bluesky using the client's send_post method
             self.at_client.send_post(
                 text=tweet_text,
-                embed=embed_external
+                embed=embed_external,
+                facets=facets
             )
             
             logger.info(f"Successfully posted to AT Protocol: {article_title}")
