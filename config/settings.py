@@ -68,23 +68,35 @@ PAYWALL_PHRASES = [
 
 # Known Paywall Domains - these sites are known to implement paywalls
 PAYWALL_DOMAINS = [
-    "wsj.com",         # Wall Street Journal
-    "nytimes.com",     # New York Times
-    "ft.com",          # Financial Times
-    "economist.com",   # The Economist
-    "bloomberg.com",   # Bloomberg
-    "washingtonpost.com", # Washington Post
-    "theatlantic.com", # The Atlantic
-    "newyorker.com",   # The New Yorker
-    "medium.com",      # Medium
-    "wired.com",       # Wired
-    "barrons.com",     # Barron's
-    "forbes.com",      # Forbes (sometimes)
-    "businessinsider.com", # Business Insider Prime
-    "insider.com",     # Insider
-    "buzzfeed.com",    # BuzzFeed (sometimes)
+    "wsj.com",              # Wall Street Journal
+    "nytimes.com",          # New York Times
+    "ft.com",               # Financial Times
+    "economist.com",        # The Economist
+    "bloomberg.com",        # Bloomberg
+    "washingtonpost.com",   # Washington Post
+    "theatlantic.com",      # The Atlantic
+    "newyorker.com",        # The New Yorker
+    "medium.com",           # Medium
+    "wired.com",            # Wired
+    "barrons.com",          # Barron's
+    "forbes.com",           # Forbes (sometimes)
+    "businessinsider.com",  # Business Insider Prime
+    "insider.com",          # Insider
+    "buzzfeed.com",         # BuzzFeed (sometimes)
     "understandingwar.org", # Institute for the Study of War
-    "federalreserve.gov"
+    "federalreserve.gov",   # Federal Reserve
+    "whitehouse.gov",       # White House
+    "congress.gov",         # Congress
+    "justice.gov",          # Department of Justice
+    "state.gov",            # Department of State
+    "defense.gov",          # Department of Defense
+    "cia.gov",              # Central Intelligence Agency
+    "nsa.gov",              # National Security Agency
+    "fbi.gov",              # Federal Bureau of Investigation
+    "dhs.gov",              # Department of Homeland Security
+    "dod.gov",              # Department of Defense
+    "nasa.gov",             # National Aeronautics and Space Administration
+    "treasury.gov",         # Department of the Treasury
 ]
 
 # Function to validate settings

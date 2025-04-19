@@ -128,7 +128,7 @@ class DatabaseConnection:
             SELECT News_Feed_ID, Title, URL
             FROM TopSources
             UNION ALL
-            SELECT TOP(160 - (SELECT COUNT(*) FROM TopSources)) News_Feed_ID, Title, URL
+            SELECT TOP(180 - (SELECT COUNT(*) FROM TopSources)) News_Feed_ID, Title, URL
             FROM RemainingItems
             ORDER BY NEWID()
         ) AS Combined
