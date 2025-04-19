@@ -99,21 +99,23 @@ class DatabaseConnection:
         query = """
         WITH TopSources AS (
             -- Get all items with the highest Source_Count value
-            SELECT URL, Title, Source_Count, News_Feed_ID
+            SELECT URL, Title, Source_Count, News_Feed_ID, Used_In_BSky
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
             AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 1
+			AND Used_In_BSky = 0
         ),
         RemainingItems AS (
             -- Get items that don't have the highest Source_Count
-            SELECT URL, Title, Source_Count, News_Feed_ID
+            SELECT URL, Title, Source_Count, News_Feed_ID, Used_In_BSky
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
             AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 0
+			AND Used_In_BSky = 0
             AND Source_Count < (
                 SELECT MAX(Source_Count)
                 FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
@@ -121,6 +123,7 @@ class DatabaseConnection:
                 AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
                 AND [Published_Date] >= DATEADD(day, -1, GETDATE())
                 AND Source_Count > 0
+				AND Used_In_BSky = 0
             )
         )
         -- Combine the two sets with top items first, then random selection from remaining
