@@ -94,7 +94,7 @@ class AIService:
         """
         try:
             # Optimize: Reduce number of posts to compare against
-            posts_to_check = recent_posts[:15]
+            posts_to_check = recent_posts[:72]
             
             # Add basic keyword matching as a pre-filter
             # Extract important keywords from title (simple approach)
