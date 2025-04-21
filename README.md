@@ -104,6 +104,7 @@ The application is configured through environment variables. Copy `.env.example`
 
 ## Change Log
 
+2025.04.21 - Updated data retrival - world news 50%, national 40%, business 10%  
 2025.04.19 - Re-added hash tag creation.  
 2025.04.18 - Bug fix for paywalled sites. Added government sites to block.    
 2025.04.14 - Major restructure, no longer a monolith py file.  

@@ -97,45 +97,100 @@ class DatabaseConnection:
         """
         # SQL query to retrieve news feed data
         query = """
-        WITH TopSources AS (
-            -- Get all items with the highest Source_Count value
-            SELECT URL, Title, Source_Count, News_Feed_ID, Used_In_BSky
+        DECLARE @TotalResults INT = 100;
+        DECLARE @Cat1Target INT = CAST(@TotalResults * 0.5 AS INT); -- 50% for Category 1 (90)
+        DECLARE @Cat2Target INT = CAST(@TotalResults * 0.4 AS INT); -- 40% for Category 2 (72)
+        DECLARE @Cat3Target INT = @TotalResults - @Cat1Target - @Cat2Target; -- 10% for Category 3 (18)
+
+        WITH AllSources AS (
+            -- Get all eligible items and rank them by Source_Count within each category
+            SELECT 
+                URL, Title, Source_Count, News_Feed_ID, Used_In_BSky, Category_ID,
+                ROW_NUMBER() OVER (PARTITION BY Category_ID ORDER BY Source_Count DESC, NEWID()) as RowNum
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
-            AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
-            AND [Published_Date] >= DATEADD(day, -1, GETDATE())
-            AND Source_Count > 1
-			AND Used_In_BSky = 0
-        ),
-        RemainingItems AS (
-            -- Get items that don't have the highest Source_Count
-            SELECT URL, Title, Source_Count, News_Feed_ID, Used_In_BSky
-            FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
-            WHERE Language_ID = 23
-            AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
+            AND (Category_ID = 1 OR Category_ID = 2 OR Category_ID = 3)
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 0
-			AND Used_In_BSky = 0
-            AND Source_Count < (
-                SELECT MAX(Source_Count)
-                FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
-                WHERE Language_ID = 23
-                AND (Category_ID = 2 OR Category_ID = 1 OR Category_ID = 3)
-                AND [Published_Date] >= DATEADD(day, -1, GETDATE())
-                AND Source_Count > 0
-				AND Used_In_BSky = 0
-            )
+            AND Used_In_BSky = 0
+        ),
+        AvailableCounts AS (
+            -- Count total available records for each category
+            SELECT 
+                Category_ID,
+                COUNT(*) AS TotalCount
+            FROM AllSources
+            GROUP BY Category_ID
+        ),
+        -- Calculate how many to take from each category, with adjustments if needed
+        CategoryAllocation AS (
+            SELECT
+                a.Category_ID,
+                a.TotalCount,
+                CASE
+                    WHEN a.Category_ID = 1 THEN @Cat1Target
+                    WHEN a.Category_ID = 2 THEN @Cat2Target
+                    WHEN a.Category_ID = 3 THEN @Cat3Target
+                END AS TargetCount,
+                CASE
+                    WHEN a.Category_ID = 1 AND a.TotalCount < @Cat1Target THEN a.TotalCount
+                    WHEN a.Category_ID = 2 AND a.TotalCount < @Cat2Target THEN a.TotalCount
+                    WHEN a.Category_ID = 3 AND a.TotalCount < @Cat3Target THEN a.TotalCount
+                    WHEN a.Category_ID = 1 THEN @Cat1Target
+                    WHEN a.Category_ID = 2 THEN @Cat2Target
+                    WHEN a.Category_ID = 3 THEN @Cat3Target
+                END AS AdjustedTarget
+            FROM AvailableCounts a
+        ),
+        -- Calculate the shortfall
+        Shortfall AS (
+            SELECT
+                SUM(TargetCount - AdjustedTarget) AS TotalShortfall
+            FROM CategoryAllocation
+            WHERE TargetCount > AdjustedTarget
+        ),
+        -- Calculate excess capacity for redistribution
+        ExcessCapacity AS (
+            SELECT
+                ca.Category_ID,
+                ca.AdjustedTarget AS BaseAllocation,
+                CASE
+                    WHEN ca.TotalCount > ca.AdjustedTarget THEN ca.TotalCount - ca.AdjustedTarget
+                    ELSE 0
+                END AS ExcessCapacity
+            FROM CategoryAllocation ca
+        ),
+        TotalExcessCapacity AS (
+            SELECT SUM(ExcessCapacity) AS TotalExcess FROM ExcessCapacity
+        ),
+        -- Final allocation with redistribution
+        FinalCategoryAllocation AS (
+            SELECT
+                ec.Category_ID,
+                ec.BaseAllocation + 
+                    CASE
+                        WHEN (SELECT TotalExcess FROM TotalExcessCapacity) > 0 AND (SELECT TotalShortfall FROM Shortfall) > 0
+                        THEN CAST(ec.ExcessCapacity * (SELECT TotalShortfall FROM Shortfall) / 
+                                (SELECT TotalExcess FROM TotalExcessCapacity) AS INT)
+                        ELSE 0
+                    END AS FinalAllocation
+            FROM ExcessCapacity ec
         )
-        -- Combine the two sets with top items first, then random selection from remaining
+        -- Final selection with proper order
         SELECT * FROM (
-            SELECT News_Feed_ID, Title, URL
-            FROM TopSources
-            UNION ALL
-            SELECT TOP(180 - (SELECT COUNT(*) FROM TopSources)) News_Feed_ID, Title, URL
-            FROM RemainingItems
-            ORDER BY NEWID()
+            SELECT 
+                a.News_Feed_ID, 
+                a.Title, 
+                a.URL, 
+                a.Category_ID, 
+                a.Source_Count,
+                CASE WHEN a.Source_Count > 1 THEN 'TopSource' ELSE 'Remaining' END AS SourceType
+            FROM AllSources a
+            JOIN FinalCategoryAllocation fca ON a.Category_ID = fca.Category_ID
+            WHERE a.RowNum <= fca.FinalAllocation
         ) AS Combined
-        ORDER BY  NEWID();
+        --order by Category_ID, Source_Count
+        ORDER BY NEWID();
         """
         
         try:
