@@ -166,11 +166,11 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             List[Dict]: The selected articles in priority order, empty list if no articles selected.
         """
         try:
-            # Take up to 30 items from the randomized list
+            # Take up to 80 items from the randomized list
             import random
             random_candidates = candidates.copy()
             random.shuffle(random_candidates)
-            candidate_list = random_candidates[:30]
+            candidate_list = random_candidates[:80]
 
             # Generate a string of recent post titles
             recent_titles = "\n".join([
