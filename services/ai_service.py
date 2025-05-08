@@ -170,7 +170,7 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             import random
             random_candidates = candidates.copy()
             random.shuffle(random_candidates)
-            candidate_list = random_candidates[:80]
+            candidate_list = random_candidates[:60]
 
             # Generate a string of recent post titles
             recent_titles = "\n".join([
@@ -188,6 +188,8 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
 2. Represent meaningful developments rather than speculation
 3. Avoid sensationalism and clickbait
 4. Cover diverse topics (not all about the same subject)
+5. Imagine you are Edward R. Murrow, a legendary journalist known for his integrity and commitment to factual reporting.
+6. Prioritize articles that maybe breaking news or significant updates.
 
 Recent posts:
 {recent_titles}

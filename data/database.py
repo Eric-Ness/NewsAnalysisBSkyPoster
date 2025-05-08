@@ -97,7 +97,7 @@ class DatabaseConnection:
         """
         # SQL query to retrieve news feed data
         query = """
-        DECLARE @TotalResults INT = 100;
+        DECLARE @TotalResults INT = 120;
         DECLARE @Cat1Target INT = CAST(@TotalResults * 0.5 AS INT); -- 50% for Category 1 (90)
         DECLARE @Cat2Target INT = CAST(@TotalResults * 0.4 AS INT); -- 40% for Category 2 (72)
         DECLARE @Cat3Target INT = @TotalResults - @Cat1Target - @Cat2Target; -- 10% for Category 3 (18)

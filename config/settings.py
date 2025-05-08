@@ -35,7 +35,7 @@ DB_CONNECTION_STRING = str('DRIVER={ODBC Driver 18 for SQL Server}; SERVER=' + D
 URL_HISTORY_FILE = os.path.join(APP_ROOT, "posted_urls.txt")
 MAX_HISTORY_LINES = 100
 CLEANUP_THRESHOLD = 10
-MAX_ARTICLE_RETRIES = 20
+MAX_ARTICLE_RETRIES = 30
 
 # AI Model Settings
 DEFAULT_AI_MODELS = [
@@ -97,6 +97,9 @@ PAYWALL_DOMAINS = [
     "dod.gov",              # Department of Defense
     "nasa.gov",             # National Aeronautics and Space Administration
     "treasury.gov",         # Department of the Treasury
+    'scmp.com',             # South China Morning Post
+    'themoscowtimes.com'    # The Moscow Times
+
 ]
 
 # Function to validate settings
