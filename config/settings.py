@@ -17,8 +17,17 @@ load_dotenv(dotenv_path=os.path.join(APP_ROOT, '.env'))
 
 # API Keys and Authentication
 GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY")
+
+# AT Protocol (BlueSky) Authentication
 AT_PROTOCOL_USERNAME = os.getenv("AT_PROTOCOL_USERNAME")
 AT_PROTOCOL_PASSWORD = os.getenv("AT_PROTOCOL_PASSWORD")
+
+# Twitter API Authentication
+TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")
+TWITTER_API_KEY_SECRET = os.getenv("TWITTER_API_KEY_SECRET")
+TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
+TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
+TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
 
 # Database Settings
 DB_SERVER = os.getenv("server")
@@ -36,6 +45,9 @@ URL_HISTORY_FILE = os.path.join(APP_ROOT, "posted_urls.txt")
 MAX_HISTORY_LINES = 100
 CLEANUP_THRESHOLD = 10
 MAX_ARTICLE_RETRIES = 30
+
+# Social Media Platform Settings
+DEFAULT_PLATFORMS = ["bluesky", "twitter"]  # Default platforms to post to
 
 # AI Model Settings
 DEFAULT_AI_MODELS = [
@@ -107,15 +119,41 @@ def validate_settings():
     """Validate that all required settings are properly configured."""
     required_vars = [
         "GOOGLE_AI_API_KEY", 
-        "AT_PROTOCOL_USERNAME", 
-        "AT_PROTOCOL_PASSWORD",
         "DB_SERVER",
         "DB_NAME", 
         "DB_USER", 
         "DB_PASSWORD"
     ]
     
+    # Check for at least one social media platform authentication
+    social_platform_auth = False
+    
+    # Check BlueSky auth
+    if AT_PROTOCOL_USERNAME and AT_PROTOCOL_PASSWORD:
+        social_platform_auth = True
+    
+    # Check Twitter auth - OAuth 1.0a or Bearer Token
+    twitter_oauth1 = all([
+        TWITTER_API_KEY, 
+        TWITTER_API_KEY_SECRET,
+        TWITTER_ACCESS_TOKEN,
+        TWITTER_ACCESS_TOKEN_SECRET
+    ])
+    
+    twitter_app_only = all([
+        TWITTER_API_KEY,
+        TWITTER_API_KEY_SECRET,
+        TWITTER_BEARER_TOKEN
+    ])
+    
+    if twitter_oauth1 or twitter_app_only:
+        social_platform_auth = True
+    
+    if not social_platform_auth:
+        raise ValueError("No social media platform authentication configured. "
+                         "Please configure either BlueSky or Twitter authentication.")
+    
     missing = [var for var in required_vars if not globals().get(var)]
     
     if missing:
-        raise ValueError(f"Missing required configuration variables: {', '.join(missing)}") 
+        raise ValueError(f"Missing required configuration variables: {', '.join(missing)}")

@@ -190,6 +190,8 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
 4. Cover diverse topics (not all about the same subject)
 5. Imagine you are Edward R. Murrow, a legendary journalist known for his integrity and commitment to factual reporting.
 6. Prioritize articles that maybe breaking news or significant updates.
+7. Avoid articles that are probably pseudo-news, pseudo-science or speculative in nature.
+8. Nothing that is essentially a press release or promotional content.
 
 Recent posts:
 {recent_titles}

@@ -105,7 +105,7 @@ class DatabaseConnection:
         WITH AllSources AS (
             -- Get all eligible items and rank them by Source_Count within each category
             SELECT 
-                URL, Title, Source_Count, News_Feed_ID, Used_In_BSky, Category_ID,
+                URL, Title, Source_Count, News_Feed_ID, Used_In_BSky, Used_In_Twitter, Category_ID,
                 ROW_NUMBER() OVER (PARTITION BY Category_ID ORDER BY Source_Count DESC, NEWID()) as RowNum
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
@@ -113,6 +113,7 @@ class DatabaseConnection:
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 0
             AND Used_In_BSky = 0
+            AND Used_In_Twitter = 0
         ),
         AvailableCounts AS (
             -- Count total available records for each category
@@ -203,7 +204,7 @@ class DatabaseConnection:
             logger.error(f"Error retrieving news feed: {e}")
             return None
     
-    def update_news_feed(self, news_feed_id: int, article_text: str, bsky_tweet: str, 
+    def update_news_feed_bluesky(self, news_feed_id: int, article_text: str, bsky_tweet: str, 
                          article_url: str, article_img: str) -> bool:
         """
         Update a news feed entry after posting to BSky.
@@ -235,16 +236,80 @@ class DatabaseConnection:
             cursor = self.conn.cursor()
             cursor.execute(query, (article_text, bsky_tweet, article_url, article_img, news_feed_id))
             self.conn.commit()
-            logger.info(f"Successfully updated database for news_feed_id: {news_feed_id}")
+            logger.info(f"Successfully updated database for BlueSky post - news_feed_id: {news_feed_id}")
             return True
             
         except Exception as e:
-            logger.error(f"Error updating news feed: {e}")
+            logger.error(f"Error updating news feed for BlueSky: {e}")
             try:
                 self.conn.rollback()
             except Exception:
                 pass
             return False
+    
+    def update_news_feed_twitter(self, news_feed_id: int, article_text: str, twitter_tweet: str, 
+                          article_url: str, article_img: str) -> bool:
+        """
+        Update a news feed entry after posting to Twitter.
+        
+        Args:
+            news_feed_id: The ID of the news feed item in the database.
+            article_text: The full text of the article.
+            twitter_tweet: The tweet text posted to Twitter.
+            article_url: The URL of the article.
+            article_img: The URL of the article's image.
+            
+        Returns:
+            bool: True if update was successful, False otherwise.
+        """
+        query = """
+        UPDATE [dbo].[tbl_News_Feed]
+        SET [Article_Text] = ?,
+            [Used_In_Twitter] = 1,
+            [Twitter_Tweet] = ?,
+            [Article_URL] = ?,
+            [Article_Img] = ?
+        WHERE [News_Feed_ID] = ?
+        """
+        
+        if not self.conn and not self.connect():
+            return False
+            
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, (article_text, twitter_tweet, article_url, article_img, news_feed_id))
+            self.conn.commit()
+            logger.info(f"Successfully updated database for Twitter post - news_feed_id: {news_feed_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error updating news feed for Twitter: {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+            return False
+    
+    def update_news_feed(self, news_feed_id: int, article_text: str, social_text: str, 
+                         article_url: str, article_img: str, platform: str = "bluesky") -> bool:
+        """
+        Update a news feed entry after posting to social media.
+        
+        Args:
+            news_feed_id: The ID of the news feed item in the database.
+            article_text: The full text of the article.
+            social_text: The text posted to social media.
+            article_url: The URL of the article.
+            article_img: The URL of the article's image.
+            platform: The social media platform ("bluesky" or "twitter").
+            
+        Returns:
+            bool: True if update was successful, False otherwise.
+        """
+        if platform.lower() == "twitter":
+            return self.update_news_feed_twitter(news_feed_id, article_text, social_text, article_url, article_img)
+        else:
+            return self.update_news_feed_bluesky(news_feed_id, article_text, social_text, article_url, article_img)
 
 # Create a default database instance for use throughout the application
-db = DatabaseConnection() 
+db = DatabaseConnection()

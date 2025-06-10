@@ -3,10 +3,10 @@ News Poster Application
 
 This is the main entry point for the News Poster application.
 It fetches news articles, selects the most newsworthy one,
-and posts it to the AT Protocol (BlueSky) feed.
+and posts it to social media platforms (BlueSky and Twitter).
 
 Author: Eric Ness
-Version: 4.0
+Version: 5.0
 """
 
 import sys
@@ -22,6 +22,7 @@ from data.database import db
 from services.article_service import ArticleService, ArticleContent
 from services.ai_service import AIService, FeedPost
 from services.social_service import SocialService
+from services.twitter_service import TwitterService
 
 # Set up logging
 logger = get_logger(__name__)
@@ -40,20 +41,29 @@ class NewsPoster:
         self.article_service = ArticleService()
         self.ai_service = AIService()
         self.social_service = SocialService()
+        self.twitter_service = TwitterService()
         
         # Validate settings
         settings.validate_settings()
     
-    def run(self, test_mode: bool = False) -> bool:
+    def run(self, test_mode: bool = False, platforms: Optional[List[str]] = None) -> bool:
         """
         Run the main workflow of the News Poster application.
         
         Args:
             test_mode: If True, runs in test mode without actually posting to social media
+            platforms: List of social media platforms to post to, defaults to settings.DEFAULT_PLATFORMS
             
         Returns:
             bool: True if successful, False otherwise
         """
+        # Set default platforms if none specified
+        if platforms is None:
+            platforms = settings.DEFAULT_PLATFORMS
+            
+        # Normalize platform names
+        platforms = [p.lower() for p in platforms]
+        
         try:
             # 1. Get news feed data from database
             news_feed_data = db.get_news_feed()
@@ -101,7 +111,19 @@ class NewsPoster:
             news_candidates = filtered_candidates
             
             # 2. Get recent posts to avoid duplicates
-            recent_posts = self.social_service.get_recent_posts()
+            recent_posts = []
+            
+            # Get recent BlueSky posts if posting to BlueSky
+            if "bluesky" in platforms:
+                bsky_posts = self.social_service.get_recent_posts()
+                recent_posts.extend(bsky_posts)
+                logger.info(f"Retrieved {len(bsky_posts)} recent BlueSky posts")
+            
+            # Get recent Twitter posts if posting to Twitter
+            if "twitter" in platforms:
+                twitter_posts = self.twitter_service.get_recent_tweets()
+                recent_posts.extend(twitter_posts)
+                logger.info(f"Retrieved {len(twitter_posts)} recent Twitter posts")
             
             # 3. Select multiple newsworthy articles and try them in order
             selected_articles = self.ai_service.select_news_articles(news_candidates, recent_posts, max_count=settings.MAX_ARTICLE_RETRIES)
@@ -160,7 +182,7 @@ class NewsPoster:
                     logger.warning(f"Article content too similar to recent posts: {article_content.title}")
                     continue
                     
-                # 8. Generate tweet text
+                # 8. Generate social media content
                 tweet_data = self.ai_service.generate_tweet(
                     article_content.text,
                     article_content.title,
@@ -168,42 +190,80 @@ class NewsPoster:
                 )
                 
                 if not tweet_data:
-                    logger.warning(f"Failed to generate tweet content for: {article_content.title}")
+                    logger.warning(f"Failed to generate social media content for: {article_content.title}")
                     continue
-                    
-                # 9. Post to social media (unless in test mode)
-                if not test_mode:
-                    posted = self.social_service.post_to_social(
-                        tweet_data['tweet_text'],
-                        article_content.url,
-                        article_content.title,
-                        article_content.top_image,
-                        tweet_data.get('facets')
-                    )
-                    
-                    if not posted:
-                        logger.warning(f"Failed to post to social media for: {article_content.title}")
-                        continue
-                        
-                    # 10. Update database
-                    db.update_news_feed(
-                        article_content.news_feed_id,
-                        article_content.text,
-                        tweet_data['tweet_text'],
-                        article_content.url,
-                        article_content.top_image or ""
-                    )
-                    
-                    # 11. Add URL to history
-                    self.article_service._add_url_to_history(article_content.url)
-                    
-                    logger.info(f"Successfully posted article: {article_content.title}")
-                else:
-                    logger.info(f"TEST MODE: Would post article: {article_content.title}")
-                    logger.info(f"Tweet text: {tweet_data['tweet_text']}")
                 
-                # If we got here, we succeeded with this article
-                return True
+                # Track success across platforms
+                success = False
+                    
+                # 9. Post to social media platforms (unless in test mode)
+                if not test_mode:
+                    # Post to BlueSky if enabled
+                    if "bluesky" in platforms:
+                        bsky_posted = self.social_service.post_to_social(
+                            tweet_data['tweet_text'],
+                            article_content.url,
+                            article_content.title,
+                            article_content.top_image,
+                            tweet_data.get('facets')
+                        )
+                        
+                        if bsky_posted:
+                            logger.info(f"Successfully posted to BlueSky: {article_content.title}")
+                            
+                            # Update database for BlueSky post
+                            db.update_news_feed(
+                                article_content.news_feed_id,
+                                article_content.text,
+                                tweet_data['tweet_text'],
+                                article_content.url,
+                                article_content.top_image or "",
+                                platform="bluesky"
+                            )
+                            
+                            success = True
+                        else:
+                            logger.warning(f"Failed to post to BlueSky for: {article_content.title}")
+                    
+                    # Post to Twitter if enabled
+                    if "twitter" in platforms:
+                        twitter_posted = self.twitter_service.post_tweet(
+                            tweet_data['tweet_text'],
+                            article_content.url,
+                            article_content.title,
+                            article_content.top_image
+                        )
+                        
+                        if twitter_posted:
+                            logger.info(f"Successfully posted to Twitter: {article_content.title}")
+                            
+                            # Update database for Twitter post
+                            db.update_news_feed(
+                                article_content.news_feed_id,
+                                article_content.text,
+                                tweet_data['tweet_text'],
+                                article_content.url,
+                                article_content.top_image or "",
+                                platform="twitter"
+                            )
+                            
+                            success = True
+                        else:
+                            logger.warning(f"Failed to post to Twitter for: {article_content.title}")
+                    
+                    # If posted to at least one platform, add URL to history
+                    if success:
+                        self.article_service._add_url_to_history(article_content.url)
+                else:
+                    # Test mode
+                    platforms_str = ", ".join(platforms)
+                    logger.info(f"TEST MODE: Would post article to {platforms_str}: {article_content.title}")
+                    logger.info(f"Social media text: {tweet_data['tweet_text']}")
+                    success = True
+                
+                # If we got here with success, we're done
+                if success:
+                    return True
             
             # If we tried all articles and none worked
             logger.error("All selected articles failed processing")
@@ -220,6 +280,8 @@ def parse_arguments():
     parser.add_argument('--log-file', type=str, default='news_poster.log', help='Log file path')
     parser.add_argument('--log-level', type=str, choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], 
                         default='INFO', help='Logging level')
+    parser.add_argument('--platforms', type=str, default=None, 
+                        help='Comma-separated list of platforms to post to (bluesky,twitter)')
     return parser.parse_args()
 
 def main():
@@ -231,13 +293,20 @@ def main():
     log_level = getattr(logging, args.log_level)
     setup_file_logging(args.log_file, log_level)
     
+    # Parse platforms
+    platforms = None
+    if args.platforms:
+        platforms = [p.strip().lower() for p in args.platforms.split(',')]
+    
     # Log application start
     logger.info("Starting News Poster application")
+    if platforms:
+        logger.info(f"Posting to platforms: {', '.join(platforms)}")
     
     try:
         # Initialize and run the News Poster
         poster = NewsPoster()
-        success = poster.run(test_mode=args.test)
+        success = poster.run(test_mode=args.test, platforms=platforms)
         
         # Report status
         if success:

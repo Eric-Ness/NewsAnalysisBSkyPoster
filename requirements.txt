@@ -1,0 +1,21 @@
+# Core dependencies
+python-dotenv>=1.0.0
+requests>=2.31.0
+pandas>=2.0.0
+pyodbc>=4.0.39
+
+# AI dependencies
+google-generativeai>=0.3.0
+
+# Website parsing & scraping
+newspaper3k>=0.2.8
+selenium>=4.11.0
+webdriver-manager>=4.0.0
+
+# Social media APIs
+atproto>=0.0.31
+tweepy>=4.14.0  # Twitter API client
+
+# Utilities
+python-dateutil>=2.8.2
+tqdm>=4.65.0
