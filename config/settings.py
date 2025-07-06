@@ -112,7 +112,8 @@ PAYWALL_DOMAINS = [
     'scmp.com',             # South China Morning Post
     'themoscowtimes.com'    # The Moscow Times
     'freebeacon.com',       # The Washington Free Beacon
-    'engadget.com',         # Engadget (sometimes)
+    'engadget.com',         # Engadget
+    'globenewswire.com'     # GlobeNewswire
 ]
 
 # Function to validate settings
