@@ -192,6 +192,10 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
 6. Prioritize articles that maybe breaking news or significant updates.
 7. Avoid articles that are probably pseudo-news, pseudo-science or speculative in nature.
 8. Nothing that is essentially a press release or promotional content.
+9. Nothing to do with celebrity gossip, sports, or entertainment unless it has significant societal impact.
+10. Avoid articles that are too similar to recent posts.
+11. Avoid articles that talk about loans, mortgages, or financial products unless they are significant news events.
+12. Avoid articles that feature sales for websites, products, or services unless they are significant news events. Like Amazon Prime Day or Black Friday.
 
 Recent posts:
 {recent_titles}
