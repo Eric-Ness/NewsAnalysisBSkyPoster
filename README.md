@@ -24,7 +24,7 @@ News Poster is designed to automate the process of selecting, processing, and po
 
 ## Project Structure
 
-```
+```text
 news-poster/
 ├── config/
 │   ├── __init__.py
@@ -50,13 +50,15 @@ news-poster/
 ## Installation
 
 1. Clone the repository:
-   ```
+
+   ```python
    git clone <repository-url>
    cd news-poster
    ```
 
 2. Create a virtual environment and install dependencies:
-   ```
+
+   ```python
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
@@ -68,7 +70,7 @@ news-poster/
 
 Run the application with the following command:
 
-```
+```python
 python main.py
 ```
 
@@ -79,7 +81,8 @@ python main.py
 - `--log-level`: Set the logging level (DEBUG, INFO, WARNING, ERROR)
 
 Example:
-```
+
+```python
 python main.py --test --log-level DEBUG
 ```
 
@@ -107,8 +110,8 @@ The application is configured through environment variables. Copy `.env.example`
 2025.07.06 - Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day
 2025.04.21 - Updated data retrival - world news 50%, national 40%, business 10%  
 2025.04.19 - Re-added hash tag creation.  
-2025.04.18 - Bug fix for paywalled sites. Added government sites to block.    
+2025.04.18 - Bug fix for paywalled sites. Added government sites to block.
 2025.04.14 - Major restructure, no longer a monolith py file.  
 2025.04.13 - Keep track bsky posts, extracted article text, and pertinent URLs.  
 2025.04.11 - Increased amount of news LLM could choose from 120 to 160 news items.  
-2025.04.10 - Added business news to the data feed
+2025.04.10 - Added business news to the data feed.
