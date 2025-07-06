@@ -107,14 +107,19 @@ The application is configured through environment variables. Copy `.env.example`
 
 ## Change Log
 
-## Change Log
+**2025.07.06** – Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day.
 
-- **2025.07.06** – Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day.
-- **2025.04.21** – Updated data retrieval: world news 50%, national 40%, business 10%.
-- **2025.04.19** – Re-added hashtag creation.
-- **2025.04.18** – Bug fix for paywalled sites. Added government sites to block.
-- **2025.04.14** – Major restructure; no longer a monolith `.py` file.
-- **2025.04.13** – Track bsky posts, extract article text, and pertinent URLs.
-- **2025.04.11** – Increased number of news items from 120 to 160.
-- **2025.04.10** – Added business news to the data feed.
+**2025.04.21** – Updated data retrieval – world news 50%, national 40%, business 10%.
+
+**2025.04.19** – Re-added hashtag creation.
+
+**2025.04.18** – Bug fix for paywalled sites. Added government sites to block.
+
+**2025.04.14** – Major restructure, no longer a monolith py file.
+
+**2025.04.13** – Keep track of bsky posts, extracted article text, and pertinent URLs.
+
+**2025.04.11** – Increased amount of news LLM could choose from 120 to 160 news items.
+
+**2025.04.10** – Added business news to the data feed.
 
