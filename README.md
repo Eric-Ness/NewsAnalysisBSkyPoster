@@ -107,7 +107,7 @@ The application is configured through environment variables. Copy `.env.example`
 
 ## Change Log
 
-**2025.07.06** – feat: Add PR Newswire to paywall domains list and increase total results in SQL query.  
+**2025.08.05** – feat: Add PR Newswire to paywall domains list and increase total results in SQL query.  
 **2025.07.06** – Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day.  
 **2025.04.21** – Updated data retrieval – world news 50%, national 40%, business 10%.  
 **2025.04.19** – Re-added hashtag creation.  
