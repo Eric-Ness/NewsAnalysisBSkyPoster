@@ -113,6 +113,7 @@ PAYWALL_DOMAINS = [
     'themoscowtimes.com'    # The Moscow Times
     'freebeacon.com',       # The Washington Free Beacon
     'engadget.com',         # Engadget
+    'prnewswire.com',       # PR Newswire
     'globenewswire.com'     # GlobeNewswire
 ]
 
