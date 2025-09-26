@@ -51,13 +51,10 @@ DEFAULT_PLATFORMS = ["bluesky", "twitter"]  # Default platforms to post to
 
 # AI Model Settings
 DEFAULT_AI_MODELS = [
-    'gemini-1.5-flash',  # Good balance of capability and cost
-    'gemini-flash',      # If available, even more cost-effective
-    'gemini-1.0-pro',    # Fallback to older model
-    'gemini-pro',        # Another fallback
-    'gemini-1.5-pro',
-    'gemini-1.5-pro-latest',
-    'gemini-2.0-pro-exp'
+    'gemini-2.0-flash',  # Good balance of capability and cost
+    'gemini-2.0-flash-lite',      # If available, even more cost-effective
+    'gemini-2.5-flash-lite',    # Fallback to older model
+    'gemini-2.5-flash'
 ]
 
 # Web Scraping Settings
