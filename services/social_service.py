@@ -7,7 +7,8 @@ and retrieving feed information.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+import json
+from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import requests
@@ -17,6 +18,7 @@ from atproto import Client, models
 from config import settings
 from utils.logger import get_logger
 from services.ai_service import FeedPost
+from data.database import db, SocialPostData
 
 logger = get_logger(__name__)
 
@@ -105,33 +107,37 @@ class SocialService:
             logger.error(f"Error fetching recent posts: {e}")
             return []
     
-    def post_to_social(self, tweet_text: str, article_url: str, article_title: str, 
-                       article_image: Optional[str] = None, facets: Optional[List[Any]] = None) -> bool:
+    def post_to_social(self, tweet_text: str, article_url: str, article_title: str,
+                       article_image: Optional[str] = None, facets: Optional[List[Any]] = None,
+                       news_feed_id: Optional[int] = None) -> Tuple[bool, Optional[int]]:
         """
         Post content to the AT Protocol feed.
-        
+
         Args:
             tweet_text: The text to post
             article_url: The URL of the article
             article_title: The title of the article
             article_image: The URL of an image to include (optional)
             facets: Rich text facets for formatting (optional)
-            
+            news_feed_id: The News_Feed_ID for linking to the source article (optional)
+
         Returns:
-            bool: True if the post was successful, False otherwise
+            Tuple[bool, Optional[int]]: (success, social_post_id) - success status and the ID of the stored post record
         """
         try:
             # Process the article image if provided
             thumb = None
+            thumb_blob_ref = None
             if article_image:
                 try:
-                    response = requests.get(article_image)
+                    response = requests.get(article_image, timeout=10)
                     img_data = response.content
                     upload = self.at_client.com.atproto.repo.upload_blob(img_data)
                     thumb = upload.blob
+                    thumb_blob_ref = str(thumb.ref) if hasattr(thumb, 'ref') else None
                 except Exception as e:
                     logger.warning(f"Failed to upload image: {e}")
-            
+
             # Create external embed
             embed_external = models.AppBskyEmbedExternal.Main(
                 external=models.AppBskyEmbedExternal.External(
@@ -143,15 +149,79 @@ class SocialService:
             )
 
             # Post to Bluesky using the client's send_post method
-            self.at_client.send_post(
+            post_response = self.at_client.send_post(
                 text=tweet_text,
                 embed=embed_external,
                 facets=facets
             )
-            
+
             logger.info(f"Successfully posted to AT Protocol: {article_title}")
-            return True
-            
+
+            # Extract post data from response and store in database
+            social_post_id = None
+            try:
+                # Get profile info for author data
+                profile = self.at_client.get_profile(settings.AT_PROTOCOL_USERNAME)
+
+                # Extract post ID and URI from response
+                post_uri = post_response.uri if hasattr(post_response, 'uri') else None
+                post_cid = post_response.cid if hasattr(post_response, 'cid') else None
+
+                # Build the web URL from the URI
+                # URI format: at://did:plc:xxxxx/app.bsky.feed.post/xxxxx
+                post_url = None
+                if post_uri:
+                    # Extract the rkey (post ID) from the URI
+                    uri_parts = post_uri.split('/')
+                    if len(uri_parts) >= 5:
+                        rkey = uri_parts[-1]
+                        post_url = f"https://bsky.app/profile/{settings.AT_PROTOCOL_USERNAME}/post/{rkey}"
+
+                # Serialize facets to JSON if present
+                facets_json = None
+                if facets:
+                    try:
+                        facets_json = json.dumps([f.model_dump() if hasattr(f, 'model_dump') else str(f) for f in facets])
+                    except Exception:
+                        facets_json = str(facets)
+
+                # Create SocialPostData object
+                post_data = SocialPostData(
+                    platform='bluesky',
+                    post_id=post_cid or post_uri.split('/')[-1] if post_uri else str(datetime.now().timestamp()),
+                    post_text=tweet_text,
+                    author_handle=settings.AT_PROTOCOL_USERNAME,
+                    created_at=datetime.now(),
+                    post_uri=post_uri,
+                    post_url=post_url,
+                    author_display_name=profile.display_name if hasattr(profile, 'display_name') else None,
+                    author_avatar_url=profile.avatar if hasattr(profile, 'avatar') else None,
+                    author_did=profile.did if hasattr(profile, 'did') else None,
+                    post_facets=facets_json,
+                    article_url=article_url,
+                    article_title=article_title,
+                    article_description=tweet_text[:100] + "..." if len(tweet_text) > 100 else tweet_text,
+                    article_image_url=article_image,
+                    article_image_blob=thumb_blob_ref,
+                    news_feed_id=news_feed_id,
+                    raw_response=json.dumps({
+                        'uri': post_uri,
+                        'cid': post_cid
+                    }) if post_uri or post_cid else None
+                )
+
+                # Insert into database
+                social_post_id = db.insert_social_post(post_data)
+                if social_post_id:
+                    logger.info(f"Stored BlueSky post in database - Social_Post_ID: {social_post_id}")
+                else:
+                    logger.warning("Failed to store BlueSky post in database")
+
+            except Exception as e:
+                logger.error(f"Error storing post data in database: {e}")
+
+            return True, social_post_id
+
         except Exception as e:
             logger.error(f"Error posting to AT Protocol: {e}")
-            return False 
+            return False, None 

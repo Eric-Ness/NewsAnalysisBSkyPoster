@@ -9,9 +9,35 @@ news feed data.
 import pyodbc
 import pandas as pd
 import logging
+import json
 from typing import Optional, List, Dict, Union, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime
 
 from config import settings
+
+
+@dataclass
+class SocialPostData:
+    """Data class for social media post information."""
+    platform: str                      # 'bluesky' or 'twitter'
+    post_id: str                       # Platform's unique post ID
+    post_text: str                     # The actual post text
+    author_handle: str                 # @handle
+    created_at: datetime               # When post was created
+    post_uri: Optional[str] = None     # Full URI (BlueSky at:// URIs)
+    post_url: Optional[str] = None     # Direct web URL to the post
+    author_display_name: Optional[str] = None
+    author_avatar_url: Optional[str] = None
+    author_did: Optional[str] = None   # BlueSky DID
+    post_facets: Optional[str] = None  # JSON string of facets
+    article_url: Optional[str] = None
+    article_title: Optional[str] = None
+    article_description: Optional[str] = None
+    article_image_url: Optional[str] = None
+    article_image_blob: Optional[str] = None
+    news_feed_id: Optional[int] = None
+    raw_response: Optional[str] = None # JSON string of full API response
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +336,132 @@ class DatabaseConnection:
             return self.update_news_feed_twitter(news_feed_id, article_text, social_text, article_url, article_img)
         else:
             return self.update_news_feed_bluesky(news_feed_id, article_text, social_text, article_url, article_img)
+
+    def insert_social_post(self, post_data: SocialPostData) -> Optional[int]:
+        """
+        Insert a social media post record into tbl_Social_Posts.
+
+        Args:
+            post_data: SocialPostData object containing post information.
+
+        Returns:
+            Optional[int]: The Social_Post_ID of the inserted record, or None if an error occurred.
+        """
+        query = """
+        INSERT INTO [dbo].[tbl_Social_Posts] (
+            [Platform], [Post_ID], [Post_URI], [Post_URL],
+            [Author_Handle], [Author_Display_Name], [Author_Avatar_URL], [Author_DID],
+            [Post_Text], [Post_Facets],
+            [Article_URL], [Article_Title], [Article_Description], [Article_Image_URL], [Article_Image_Blob],
+            [Created_At], [News_Feed_ID], [Raw_Response]
+        )
+        OUTPUT INSERTED.Social_Post_ID
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        if not self.conn and not self.connect():
+            return None
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, (
+                post_data.platform,
+                post_data.post_id,
+                post_data.post_uri,
+                post_data.post_url,
+                post_data.author_handle,
+                post_data.author_display_name,
+                post_data.author_avatar_url,
+                post_data.author_did,
+                post_data.post_text,
+                post_data.post_facets,
+                post_data.article_url,
+                post_data.article_title,
+                post_data.article_description,
+                post_data.article_image_url,
+                post_data.article_image_blob,
+                post_data.created_at,
+                post_data.news_feed_id,
+                post_data.raw_response
+            ))
+
+            # Get the inserted ID from OUTPUT clause
+            row = cursor.fetchone()
+            self.conn.commit()
+
+            if row:
+                inserted_id = row[0]
+                logger.info(f"Successfully inserted social post - Social_Post_ID: {inserted_id}, Platform: {post_data.platform}")
+                return inserted_id
+            return None
+
+        except Exception as e:
+            logger.error(f"Error inserting social post: {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+            return None
+
+    def get_social_post_by_id(self, social_post_id: int) -> Optional[Dict]:
+        """
+        Retrieve a social post by its ID.
+
+        Args:
+            social_post_id: The Social_Post_ID to look up.
+
+        Returns:
+            Optional[Dict]: The post data as a dictionary, or None if not found.
+        """
+        query = """
+        SELECT * FROM [dbo].[tbl_Social_Posts]
+        WHERE [Social_Post_ID] = ?
+        """
+        results = self.execute_query(query, (social_post_id,))
+        return results[0] if results else None
+
+    def get_social_posts_by_news_feed_id(self, news_feed_id: int) -> Optional[List[Dict]]:
+        """
+        Retrieve all social posts associated with a news feed item.
+
+        Args:
+            news_feed_id: The News_Feed_ID to look up.
+
+        Returns:
+            Optional[List[Dict]]: List of post data dictionaries, or None if error.
+        """
+        query = """
+        SELECT * FROM [dbo].[tbl_Social_Posts]
+        WHERE [News_Feed_ID] = ?
+        ORDER BY [Created_At] DESC
+        """
+        return self.execute_query(query, (news_feed_id,))
+
+    def get_recent_social_posts(self, platform: Optional[str] = None, limit: int = 50) -> Optional[List[Dict]]:
+        """
+        Retrieve recent social posts, optionally filtered by platform.
+
+        Args:
+            platform: Filter by platform ('bluesky' or 'twitter'), or None for all.
+            limit: Maximum number of posts to return.
+
+        Returns:
+            Optional[List[Dict]]: List of post data dictionaries, or None if error.
+        """
+        if platform:
+            query = """
+            SELECT TOP (?) * FROM [dbo].[tbl_Social_Posts]
+            WHERE [Platform] = ?
+            ORDER BY [Created_At] DESC
+            """
+            return self.execute_query(query, (limit, platform))
+        else:
+            query = """
+            SELECT TOP (?) * FROM [dbo].[tbl_Social_Posts]
+            ORDER BY [Created_At] DESC
+            """
+            return self.execute_query(query, (limit,))
+
 
 # Create a default database instance for use throughout the application
 db = DatabaseConnection()

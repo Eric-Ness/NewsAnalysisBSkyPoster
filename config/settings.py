@@ -107,11 +107,11 @@ PAYWALL_DOMAINS = [
     "nasa.gov",             # National Aeronautics and Space Administration
     "treasury.gov",         # Department of the Treasury
     'scmp.com',             # South China Morning Post
-    'themoscowtimes.com'    # The Moscow Times
+    'themoscowtimes.com',   # The Moscow Times
     'freebeacon.com',       # The Washington Free Beacon
     'engadget.com',         # Engadget
     'prnewswire.com',       # PR Newswire
-    'globenewswire.com'     # GlobeNewswire
+    'globenewswire.com'     # GlobeNewswire (last item, no comma needed)
 ]
 
 # Function to validate settings

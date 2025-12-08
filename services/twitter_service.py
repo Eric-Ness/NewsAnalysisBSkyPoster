@@ -7,7 +7,7 @@ posting content, and retrieving tweet information.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
 import requests
@@ -23,6 +23,7 @@ import tweepy
 from services.ai_service import FeedPost
 from config import settings
 from utils.logger import get_logger
+from data.database import db, SocialPostData
 
 logger = get_logger(__name__)
 
@@ -185,49 +186,58 @@ class TwitterService:
             logger.error(f"Error fetching recent tweets: {e}")
             return []
 
-    def post_tweet(self, tweet_text: str, article_url: str, article_title: str, 
-                   article_image: Optional[str] = None) -> bool:
+    def post_tweet(self, tweet_text: str, article_url: str, article_title: str,
+                   article_image: Optional[str] = None,
+                   news_feed_id: Optional[int] = None) -> Tuple[bool, Optional[int]]:
         """
         Post a tweet with an article link.
-        
+
         Args:
             tweet_text: The text to tweet
             article_url: The URL of the article
             article_title: The title of the article
             article_image: The URL of an image to include (optional)
-            
+            news_feed_id: The News_Feed_ID for linking to the source article (optional)
+
         Returns:
-            bool: True if the tweet was successful, False otherwise
+            Tuple[bool, Optional[int]]: (success, social_post_id) - success status and the ID of the stored post record
         """
         try:
             if not self.client:
                 logger.error("Twitter client not initialized")
-                return False
-                
+                return False, None
+
             # Ensure tweet text is within Twitter's character limit (280 chars)
             # URLs are shortened by Twitter's t.co service to 23 characters
             url_length = 23
-            
+
             # Remove URL from text if it's already there (to avoid duplication)
             text_without_url = re.sub(r'https?://\S+', '', tweet_text)
-            
+
             # Calculate available characters
             available_chars = 280 - url_length
-            
+
             # Truncate text if needed
             if len(text_without_url) > available_chars:
                 truncated_text = text_without_url[:available_chars-4] + "..."
             else:
                 truncated_text = text_without_url
-                
+
             # Combine text with URL
             final_tweet_text = f"{truncated_text.strip()} {article_url}"
-            
+
+            # Variables to store tweet response data
+            tweet_id = None
+            tweet_response = None
+            author_handle = None
+            author_display_name = None
+            author_avatar_url = None
+
             # Post the tweet
             if isinstance(self.client, tweepy.API):
                 # Using API v1.1 (OAuth 1.0a)
                 media_ids = []
-                
+
                 # Upload media if provided and supported
                 if article_image and article_image.startswith('http'):
                     try:
@@ -237,51 +247,114 @@ class TwitterService:
                             # Create a temporary file
                             import tempfile
                             import os
-                            
+
                             with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as temp_file:
                                 temp_filename = temp_file.name
                                 temp_file.write(image_response.content)
-                            
+
                             # Upload the media
                             media = self.client.media_upload(temp_filename)
                             media_ids.append(media.media_id)
-                            
+
                             # Clean up the temporary file
                             os.unlink(temp_filename)
-                            
+
                     except Exception as e:
                         logger.warning(f"Failed to upload media: {e}")
-                
+
                 # Post the tweet
                 if media_ids:
-                    tweet = self.client.update_status(
+                    tweet_response = self.client.update_status(
                         status=final_tweet_text,
                         media_ids=media_ids
                     )
                 else:
-                    tweet = self.client.update_status(status=final_tweet_text)
-                
+                    tweet_response = self.client.update_status(status=final_tweet_text)
+
+                # Extract data from v1.1 response
+                if tweet_response:
+                    tweet_id = str(tweet_response.id)
+                    if hasattr(tweet_response, 'user'):
+                        author_handle = tweet_response.user.screen_name
+                        author_display_name = tweet_response.user.name
+                        author_avatar_url = tweet_response.user.profile_image_url_https
+
                 logger.info(f"Successfully posted tweet: {article_title}")
-                return True
-                
+
             else:
                 # Using API v2 (Client)
                 # Check if we have write permissions
                 if not self.access_token or not self.access_token_secret:
                     logger.error("Cannot post tweets with Bearer Token authentication. "
                                 "OAuth 1.0a credentials are required for posting.")
-                    return False
-                
+                    return False, None
+
                 # Create the tweet
                 response = self.client.create_tweet(text=final_tweet_text)
-                
+
                 if response and hasattr(response, 'data'):
+                    tweet_id = str(response.data['id'])
+                    tweet_response = response
+
+                    # Try to get user info
+                    try:
+                        me = self.client.get_me(user_fields=['profile_image_url'])
+                        if me and hasattr(me, 'data'):
+                            author_handle = me.data.username
+                            author_display_name = me.data.name
+                            author_avatar_url = me.data.profile_image_url if hasattr(me.data, 'profile_image_url') else None
+                    except Exception as e:
+                        logger.warning(f"Could not fetch user info: {e}")
+
                     logger.info(f"Successfully posted tweet: {article_title}")
-                    return True
                 else:
                     logger.error("Failed to post tweet: No valid response from Twitter API")
-                    return False
-                
+                    return False, None
+
+            # Store post data in database
+            social_post_id = None
+            if tweet_id:
+                try:
+                    # Build tweet URL
+                    post_url = f"https://twitter.com/{author_handle}/status/{tweet_id}" if author_handle else None
+
+                    # Create SocialPostData object
+                    post_data = SocialPostData(
+                        platform='twitter',
+                        post_id=tweet_id,
+                        post_text=final_tweet_text,
+                        author_handle=author_handle or 'unknown',
+                        created_at=datetime.now(),
+                        post_uri=None,  # Twitter doesn't use URIs like BlueSky
+                        post_url=post_url,
+                        author_display_name=author_display_name,
+                        author_avatar_url=author_avatar_url,
+                        author_did=None,  # Twitter doesn't have DIDs
+                        post_facets=None,  # Twitter doesn't use facets
+                        article_url=article_url,
+                        article_title=article_title,
+                        article_description=None,
+                        article_image_url=article_image,
+                        article_image_blob=None,
+                        news_feed_id=news_feed_id,
+                        raw_response=json.dumps({
+                            'id': tweet_id,
+                            'text': final_tweet_text
+                        })
+                    )
+
+                    # Insert into database
+                    social_post_id = db.insert_social_post(post_data)
+                    if social_post_id:
+                        logger.info(f"Stored Twitter post in database - Social_Post_ID: {social_post_id}")
+                    else:
+                        logger.warning("Failed to store Twitter post in database")
+
+                except Exception as e:
+                    logger.error(f"Error storing tweet data in database: {e}")
+
+            return True, social_post_id
+
         except Exception as e:
             logger.error(f"Error posting tweet: {e}")
-            return False
+            return False, None

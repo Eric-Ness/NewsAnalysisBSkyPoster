@@ -200,17 +200,20 @@ class NewsPoster:
                 if not test_mode:
                     # Post to BlueSky if enabled
                     if "bluesky" in platforms:
-                        bsky_posted = self.social_service.post_to_social(
+                        bsky_posted, bsky_social_post_id = self.social_service.post_to_social(
                             tweet_data['tweet_text'],
                             article_content.url,
                             article_content.title,
                             article_content.top_image,
-                            tweet_data.get('facets')
+                            tweet_data.get('facets'),
+                            news_feed_id=article_content.news_feed_id
                         )
-                        
+
                         if bsky_posted:
                             logger.info(f"Successfully posted to BlueSky: {article_content.title}")
-                            
+                            if bsky_social_post_id:
+                                logger.info(f"BlueSky post stored with Social_Post_ID: {bsky_social_post_id}")
+
                             # Update database for BlueSky post
                             db.update_news_feed(
                                 article_content.news_feed_id,
@@ -220,23 +223,26 @@ class NewsPoster:
                                 article_content.top_image or "",
                                 platform="bluesky"
                             )
-                            
+
                             success = True
                         else:
                             logger.warning(f"Failed to post to BlueSky for: {article_content.title}")
                     
                     # Post to Twitter if enabled
                     if "twitter" in platforms:
-                        twitter_posted = self.twitter_service.post_tweet(
+                        twitter_posted, twitter_social_post_id = self.twitter_service.post_tweet(
                             tweet_data['tweet_text'],
                             article_content.url,
                             article_content.title,
-                            article_content.top_image
+                            article_content.top_image,
+                            news_feed_id=article_content.news_feed_id
                         )
-                        
+
                         if twitter_posted:
                             logger.info(f"Successfully posted to Twitter: {article_content.title}")
-                            
+                            if twitter_social_post_id:
+                                logger.info(f"Twitter post stored with Social_Post_ID: {twitter_social_post_id}")
+
                             # Update database for Twitter post
                             db.update_news_feed(
                                 article_content.news_feed_id,
