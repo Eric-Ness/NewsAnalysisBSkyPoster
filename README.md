@@ -10,8 +10,9 @@ News Poster is designed to automate the process of selecting, processing, and po
 2. Uses Google's Gemini AI to select the most newsworthy article
 3. Fetches the article content, handling paywalls and content extraction
 4. Generates a concise, informative social media post
-5. Posts the content to BlueSky
-6. Updates the database with information about the posted article
+5. Posts the content to BlueSky and/or Twitter
+6. Stores complete post data for embed rendering on external sites
+7. Updates the database with information about the posted article
 
 ## Features
 
@@ -19,7 +20,8 @@ News Poster is designed to automate the process of selecting, processing, and po
 - **Content Similarity Detection**: Avoids posting articles too similar to recent posts
 - **Paywall Detection**: Identifies and skips articles behind paywalls
 - **URL History Tracking**: Maintains a record of previously posted URLs to avoid duplicates
-- **Automated Social Media Posting**: Posts to BlueSky with article preview and link
+- **Multi-Platform Posting**: Posts to BlueSky and Twitter with article preview and link
+- **Social Post Storage**: Stores complete post metadata for embed rendering on third-party sites
 - **Database Integration**: Works with a SQL Server database to track articles and update status
 
 ## Project Structure
@@ -31,12 +33,15 @@ news-poster/
 │   └── settings.py           # Centralized configuration settings
 ├── data/
 │   ├── __init__.py
-│   └── database.py           # Consolidated database operations
+│   └── database.py           # Database operations and SocialPostData model
+├── migrations/
+│   └── 001_create_social_posts_table.sql  # Social posts table schema
 ├── services/
 │   ├── __init__.py
 │   ├── article_service.py    # Article fetching and processing
 │   ├── ai_service.py         # AI/ML operations with Gemini
-│   └── social_service.py     # AT Protocol integration
+│   ├── social_service.py     # BlueSky AT Protocol integration
+│   └── twitter_service.py    # Twitter API integration
 ├── utils/
 │   ├── __init__.py
 │   ├── logger.py             # Centralized logging
@@ -103,10 +108,28 @@ The application is configured through environment variables. Copy `.env.example`
 - `GOOGLE_AI_API_KEY`: Your Google AI API key for Gemini
 - `AT_PROTOCOL_USERNAME`: Your BlueSky username
 - `AT_PROTOCOL_PASSWORD`: Your BlueSky password
+- `TWITTER_API_KEY`, `TWITTER_API_KEY_SECRET`: Twitter API credentials
+- `TWITTER_ACCESS_TOKEN`, `TWITTER_ACCESS_TOKEN_SECRET`: Twitter OAuth tokens
+- `TWITTER_BEARER_TOKEN`: Twitter Bearer token (optional)
 - Database configuration: `server`, `db`, `user`, `pwd`
+
+## Database Schema
+
+The application uses two main tables:
+
+- **tbl_News_Feed**: Stores news articles and their processing status
+- **tbl_Social_Posts**: Stores posted social media content for embed rendering
+
+The `tbl_Social_Posts` table captures all data needed to reproduce posts as embeds:
+
+- Post content and facets (rich text formatting)
+- Author information (handle, display name, avatar)
+- Article link card data (title, description, image)
+- Platform-specific IDs and URIs
 
 ## Change Log
 
+**2025.12.08** – Added social posts storage for embed support (tbl_Social_Posts table).
 **2025.09.25** – Updated Gemini Models List.  
 **2025.08.05** – feat: Add PR Newswire to paywall domains list and increase total results in SQL query.  
 **2025.07.06** – Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day.  

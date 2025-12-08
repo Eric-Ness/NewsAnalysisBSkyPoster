@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Skill(create-plans)",
+      "Bash(mkdir:*)",
+      "Bash(gh issue create:*)",
+      "Bash(gh auth:*)",
+      "Bash(where gh:*)",
+      "Bash(powershell:*)",
+      "Bash(git add:*)",
+      "Bash(git push)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
