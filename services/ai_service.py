@@ -6,7 +6,6 @@ It provides functionality for content generation, article selection,
 and assessing article similarity.
 """
 
-import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
@@ -27,10 +26,6 @@ class FeedPost:
     url: Optional[str]
     title: Optional[str]
     timestamp: datetime
-
-class DuplicateContentError(Exception):
-    """Custom exception for duplicate or similar content detection."""
-    pass
 
 class AIService:
     """Service for AI operations with Google's Gemini API."""
@@ -94,12 +89,12 @@ class AIService:
         """
         try:
             # Optimize: Reduce number of posts to compare against
-            posts_to_check = recent_posts[:72]
+            posts_to_check = recent_posts[:settings.SIMILARITY_CHECK_POSTS_LIMIT]
             
             # Add basic keyword matching as a pre-filter
             # Extract important keywords from title (simple approach)
             title_words = set(re.sub(r'[^\w\s]', '', article_title.lower()).split())
-            title_words = {w for w in title_words if len(w) > 3}  # Only keep meaningful words
+            title_words = {w for w in title_words if len(w) > settings.MIN_KEYWORD_LENGTH}  # Only keep meaningful words
             
             # Check for basic title similarity first (cheaper than AI check)
             for post in posts_to_check:
@@ -107,14 +102,14 @@ class AIService:
                     continue
                     
                 post_title_words = set(re.sub(r'[^\w\s]', '', post.title.lower()).split())
-                post_title_words = {w for w in post_title_words if len(w) > 3}
+                post_title_words = {w for w in post_title_words if len(w) > settings.MIN_KEYWORD_LENGTH}
                 
                 # If more than 50% of important words match, likely similar content
                 if title_words and post_title_words:
                     word_overlap = len(title_words.intersection(post_title_words))
                     similarity_ratio = word_overlap / min(len(title_words), len(post_title_words))
                     
-                    if similarity_ratio > 0.5:
+                    if similarity_ratio > settings.TITLE_SIMILARITY_THRESHOLD:
                         logger.info(f"Title keyword similarity detected ({similarity_ratio:.2f}): '{article_title[:50]}...'")
                         return True
             
@@ -131,7 +126,7 @@ class AIService:
 
 New Article:
 Title: {article_title}
-Text: {article_text[:500]}...  
+Text: {article_text[:settings.AI_COMPARISON_TEXT_LENGTH]}...  
 
 Recent Post Titles:
 {recent_content}
@@ -166,11 +161,11 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             List[Dict]: The selected articles in priority order, empty list if no articles selected.
         """
         try:
-            # Take up to 80 items from the randomized list
+            # Take up to CANDIDATE_SELECTION_LIMIT items from the randomized list
             import random
             random_candidates = candidates.copy()
             random.shuffle(random_candidates)
-            candidate_list = random_candidates[:60]
+            candidate_list = random_candidates[:settings.CANDIDATE_SELECTION_LIMIT]
 
             # Generate a string of recent post titles
             recent_titles = "\n".join([
@@ -299,7 +294,7 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
         """
         try:
             # Limit article text to reduce token usage
-            truncated_text = article_text[:4000] if article_text else ""
+            truncated_text = article_text[:settings.ARTICLE_TEXT_TRUNCATE_LENGTH] if article_text else ""
             
             prompt = f"""Create a brief, informative social media post for the following news article.
             
@@ -310,7 +305,7 @@ Article Content: {truncated_text}
 Requirements:
 1. Be factual and objective - no editorializing or opinions
 2. Include the most important information only (who, what, where, when)
-3. Keep it under 260 characters (excluding hashtags)
+3. Keep it under {settings.TWEET_CHARACTER_LIMIT} characters (excluding hashtags)
 4. Use neutral, straightforward language
 5. Add ONE relevant hashtag at the end that best represents the subject or category
 

@@ -44,10 +44,6 @@ class ArticleContent:
     top_image: str
     news_feed_id: Optional[int] = None
 
-class PaywallError(Exception):
-    """Custom exception for paywall detection."""
-    pass
-
 class ArticleService:
     """Service for fetching and processing articles."""
     
@@ -84,7 +80,7 @@ class ArticleService:
             driver = webdriver.Chrome(options=chrome_options, service=service)
             
             driver.get(google_url)
-            time.sleep(3)  # Allow redirect to complete
+            time.sleep(settings.SELENIUM_REDIRECT_TIMEOUT)  # Allow redirect to complete
             return driver.current_url
 
         except Exception as e:
@@ -144,7 +140,7 @@ class ArticleService:
             article.nlp()
 
             # Basic content quality check
-            if not article.text or len(article.text.split()) < 50:
+            if not article.text or len(article.text.split()) < settings.MIN_ARTICLE_WORD_COUNT:
                 # Check for paywall indicators
                 if any(phrase in article.html.lower() for phrase in settings.PAYWALL_PHRASES):
                     logger.warning(f"Paywall detected for {url}")
@@ -158,7 +154,7 @@ class ArticleService:
                 url=article.url,
                 title=article.title,
                 text=article.text,
-                summary=article.summary[:97] + "..." if len(article.summary) > 100 else article.summary,
+                summary=article.summary[:settings.SUMMARY_TRUNCATE_LENGTH] + "..." if len(article.summary) > 100 else article.summary,
                 top_image=article.top_image,
                 news_feed_id=news_feed_id
             )
@@ -191,7 +187,7 @@ class ArticleService:
             
             # Load the page
             driver.get(url)
-            time.sleep(5)  # Wait for JavaScript to load
+            time.sleep(settings.SELENIUM_PAGE_LOAD_TIMEOUT)  # Wait for JavaScript to load
             
             # Extract content
             title = driver.title
@@ -200,7 +196,7 @@ class ArticleService:
             html_content = driver.page_source
             
             # Try to extract paragraphs directly
-            paragraphs = driver.find_elements(By.XPATH, "//p[string-length(text()) > 20]")
+            paragraphs = driver.find_elements(By.XPATH, f"//p[string-length(text()) > {settings.XPATH_MIN_TEXT_LENGTH}]")
             text = " ".join([p.text for p in paragraphs if p.text.strip()])
             
             # Try to get main image (from meta tags first, then from regular img tags)
@@ -215,13 +211,13 @@ class ArticleService:
                     img_url = images[0].get_attribute("src")
             
             # If we didn't get enough text content, try article element
-            if len(text.split()) < 50:
+            if len(text.split()) < settings.MIN_ARTICLE_WORD_COUNT:
                 article_element = driver.find_elements(By.CSS_SELECTOR, "article, .article-content, #article-body")
                 if article_element:
                     text = article_element[0].text
             
             # If still insufficient content, log HTML for debugging
-            if len(text.split()) < 50:
+            if len(text.split()) < settings.MIN_ARTICLE_WORD_COUNT:
                 logger.warning(f"Selenium extraction yielded insufficient content: {len(text.split())} words")
                 debug_dir = "debug_html"
                 os.makedirs(debug_dir, exist_ok=True)
@@ -238,7 +234,7 @@ class ArticleService:
                 return None
             
             # Create summary
-            summary = " ".join(text.split()[:30]) + "..." if len(text.split()) > 30 else text
+            summary = " ".join(text.split()[:settings.SUMMARY_WORD_LIMIT]) + "..." if len(text.split()) > settings.SUMMARY_WORD_LIMIT else text
             
             return ArticleContent(
                 url=url,

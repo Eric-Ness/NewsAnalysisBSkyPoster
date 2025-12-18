@@ -6,10 +6,8 @@ It provides functionality for authenticating with BlueSky, posting content,
 and retrieving feed information.
 """
 
-import logging
 import json
-from typing import Optional, List, Dict, Any, Tuple
-from dataclasses import dataclass
+from typing import Optional, List, Any, Tuple
 from datetime import datetime
 import requests
 
@@ -53,7 +51,7 @@ class SocialService:
             logger.error(f"Failed to authenticate with AT Protocol: {e}")
             return False
     
-    def get_recent_posts(self, limit: int = 80) -> List[FeedPost]:
+    def get_recent_posts(self, limit: int = settings.BLUESKY_FETCH_LIMIT) -> List[FeedPost]:
         """
         Fetches recent posts from the AT Protocol feed.
 
@@ -130,7 +128,7 @@ class SocialService:
             thumb_blob_ref = None
             if article_image:
                 try:
-                    response = requests.get(article_image, timeout=10)
+                    response = requests.get(article_image, timeout=settings.BLUESKY_IMAGE_TIMEOUT)
                     img_data = response.content
                     upload = self.at_client.com.atproto.repo.upload_blob(img_data)
                     thumb = upload.blob
@@ -142,7 +140,7 @@ class SocialService:
             embed_external = models.AppBskyEmbedExternal.Main(
                 external=models.AppBskyEmbedExternal.External(
                     title=article_title,
-                    description=tweet_text[:100] + "..." if len(tweet_text) > 100 else tweet_text,
+                    description=tweet_text[:settings.EMBED_DESCRIPTION_LENGTH] + "..." if len(tweet_text) > settings.EMBED_DESCRIPTION_LENGTH else tweet_text,
                     uri=article_url,
                     thumb=thumb
                 )
@@ -200,7 +198,7 @@ class SocialService:
                     post_facets=facets_json,
                     article_url=article_url,
                     article_title=article_title,
-                    article_description=tweet_text[:100] + "..." if len(tweet_text) > 100 else tweet_text,
+                    article_description=tweet_text[:settings.EMBED_DESCRIPTION_LENGTH] + "..." if len(tweet_text) > settings.EMBED_DESCRIPTION_LENGTH else tweet_text,
                     article_image_url=article_image,
                     article_image_blob=thumb_blob_ref,
                     news_feed_id=news_feed_id,

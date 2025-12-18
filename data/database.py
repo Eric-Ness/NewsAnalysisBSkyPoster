@@ -9,9 +9,8 @@ news feed data.
 import pyodbc
 import pandas as pd
 import logging
-import json
-from typing import Optional, List, Dict, Union, Any
-from dataclasses import dataclass, asdict
+from typing import Optional, List, Dict
+from dataclasses import dataclass
 from datetime import datetime
 
 from config import settings
@@ -122,10 +121,15 @@ class DatabaseConnection:
             Optional[pd.DataFrame]: DataFrame containing news feed data, or None if an error occurred.
         """
         # SQL query to retrieve news feed data
-        query = """
-        DECLARE @TotalResults INT = 160;
-        DECLARE @Cat1Target INT = CAST(@TotalResults * 0.5 AS INT); -- 50% for Category 1 (90)
-        DECLARE @Cat2Target INT = CAST(@TotalResults * 0.4 AS INT); -- 40% for Category 2 (72)
+        # Using settings for allocation percentages
+        total_results = settings.DB_TOTAL_NEWS_FEED_RESULTS
+        cat1_alloc = settings.DB_CAT1_ALLOCATION
+        cat2_alloc = settings.DB_CAT2_ALLOCATION
+
+        query = f"""
+        DECLARE @TotalResults INT = {total_results};
+        DECLARE @Cat1Target INT = CAST(@TotalResults * {cat1_alloc} AS INT); -- {int(cat1_alloc*100)}% for Category 1
+        DECLARE @Cat2Target INT = CAST(@TotalResults * {cat2_alloc} AS INT); -- {int(cat2_alloc*100)}% for Category 2
         DECLARE @Cat3Target INT = @TotalResults - @Cat1Target - @Cat2Target; -- 10% for Category 3 (18)
 
         WITH AllSources AS (

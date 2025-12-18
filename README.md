@@ -45,7 +45,8 @@ news-poster/
 ├── utils/
 │   ├── __init__.py
 │   ├── logger.py             # Centralized logging
-│   └── helpers.py            # Helper functions
+│   ├── helpers.py            # Helper functions
+│   └── exceptions.py         # Custom exception classes
 ├── main.py                   # Application entry point
 ├── .env.example              # Environment variables template
 ├── .gitignore                # Git ignore file
@@ -129,6 +130,7 @@ The `tbl_Social_Posts` table captures all data needed to reproduce posts as embe
 
 ## Change Log
 
+**2025.12.18** – Configuration cleanup: extracted magic numbers to settings.py, added config validation, created custom exception classes.
 **2025.12.08** – Added social posts storage for embed support (tbl_Social_Posts table).
 **2025.09.25** – Updated Gemini Models List.  
 **2025.08.05** – feat: Add PR Newswire to paywall domains list and increase total results in SQL query.  

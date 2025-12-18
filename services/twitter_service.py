@@ -6,17 +6,10 @@ It provides functionality for authenticating with Twitter,
 posting content, and retrieving tweet information.
 """
 
-import logging
-from typing import Optional, List, Dict, Any, Tuple
-from dataclasses import dataclass
+from typing import Optional, List, Tuple
 from datetime import datetime
 import requests
 import json
-import base64
-import hmac
-import hashlib
-import urllib.parse
-import time
 import re
 import tweepy
 
@@ -82,7 +75,7 @@ class TwitterService:
             logger.error(f"Failed to authenticate with Twitter: {e}")
             return False
 
-    def get_recent_tweets(self, limit: int = 50) -> List[FeedPost]:
+    def get_recent_tweets(self, limit: int = settings.TWITTER_FETCH_LIMIT) -> List[FeedPost]:
         """
         Fetches recent tweets from the user's timeline.
 
@@ -133,8 +126,9 @@ class TwitterService:
                 try:
                     # Try to get the authenticated user
                     me = self.client.get_me()
-                except:
+                except Exception as e:
                     # If that fails (e.g., with bearer token), use a fallback method
+                    logger.debug(f"Could not get authenticated user directly: {e}")
                     if self.access_token:
                         # Extract user ID from access token (format: user_id-alphanumeric)
                         user_id = self.access_token.split('-')[0]
@@ -149,7 +143,7 @@ class TwitterService:
                 # Get recent tweets with expansions for URLs
                 recent_tweets = self.client.get_users_tweets(
                     id=user_id,
-                    max_results=min(limit, 100),  # API limit is 100
+                    max_results=min(limit, settings.TWITTER_API_MAX_RESULTS),  # API limit
                     tweet_fields=['created_at', 'entities'],
                     expansions=['attachments.media_keys'],
                     media_fields=['url']
@@ -207,19 +201,19 @@ class TwitterService:
                 logger.error("Twitter client not initialized")
                 return False, None
 
-            # Ensure tweet text is within Twitter's character limit (280 chars)
-            # URLs are shortened by Twitter's t.co service to 23 characters
-            url_length = 23
+            # Ensure tweet text is within Twitter's character limit
+            # URLs are shortened by Twitter's t.co service
+            url_length = settings.TWITTER_URL_LENGTH
 
             # Remove URL from text if it's already there (to avoid duplication)
             text_without_url = re.sub(r'https?://\S+', '', tweet_text)
 
             # Calculate available characters
-            available_chars = 280 - url_length
+            available_chars = settings.TWITTER_CHARACTER_LIMIT - url_length
 
             # Truncate text if needed
             if len(text_without_url) > available_chars:
-                truncated_text = text_without_url[:available_chars-4] + "..."
+                truncated_text = text_without_url[:available_chars - settings.TWEET_TRUNCATION_PADDING] + "..."
             else:
                 truncated_text = text_without_url
 
@@ -242,7 +236,7 @@ class TwitterService:
                 if article_image and article_image.startswith('http'):
                     try:
                         # Download the image
-                        image_response = requests.get(article_image, timeout=10)
+                        image_response = requests.get(article_image, timeout=settings.TWITTER_IMAGE_TIMEOUT)
                         if image_response.status_code == 200:
                             # Create a temporary file
                             import tempfile
