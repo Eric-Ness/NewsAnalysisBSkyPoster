@@ -30,15 +30,20 @@ TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
 
 # Database Settings
-DB_SERVER = os.getenv("server")
-DB_NAME = os.getenv("db")
-DB_USER = os.getenv("user")
-DB_PASSWORD = os.getenv("pwd")
-DB_CONNECTION_STRING = str('DRIVER={ODBC Driver 18 for SQL Server}; SERVER=' + DB_SERVER + 
-                      '; DATABASE=' + DB_NAME + 
-                      '; UID=' + DB_USER + 
-                      '; PWD=' + DB_PASSWORD + 
-                      '; TrustServerCertificate=yes; MARS_Connection=yes;')
+DB_SERVER = os.getenv("server", "")
+DB_NAME = os.getenv("db", "")
+DB_USER = os.getenv("user", "")
+DB_PASSWORD = os.getenv("pwd", "")
+
+# Build connection string safely (validation happens in validate_settings())
+DB_CONNECTION_STRING = (
+    f"DRIVER={{ODBC Driver 18 for SQL Server}}; "
+    f"SERVER={DB_SERVER}; "
+    f"DATABASE={DB_NAME}; "
+    f"UID={DB_USER}; "
+    f"PWD={DB_PASSWORD}; "
+    f"TrustServerCertificate=yes; MARS_Connection=yes;"
+) if all([DB_SERVER, DB_NAME, DB_USER, DB_PASSWORD]) else ""
 
 # Application Settings
 URL_HISTORY_FILE = os.path.join(APP_ROOT, "posted_urls.txt")
@@ -202,6 +207,10 @@ def validate_settings():
     for var_name, var_value in required_vars:
         if not var_value:
             errors.append(f"Missing required environment variable: {var_name}")
+
+    # Verify database connection string was built successfully
+    if not DB_CONNECTION_STRING:
+        errors.append("Database connection string could not be built. Check DB_SERVER, DB_NAME, DB_USER, DB_PASSWORD.")
 
     # Check for at least one social media platform authentication
     bluesky_configured = bool(AT_PROTOCOL_USERNAME and AT_PROTOCOL_PASSWORD)
