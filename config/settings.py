@@ -173,6 +173,7 @@ PAYWALL_DOMAINS = [
     'freebeacon.com',       # The Washington Free Beacon
     'engadget.com',         # Engadget
     'prnewswire.com',       # PR Newswire
+    'vaticannews.va'        # Vatican News
     'globenewswire.com'     # GlobeNewswire (last item, no comma needed)
 ]
 
