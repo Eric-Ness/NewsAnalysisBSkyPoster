@@ -174,6 +174,7 @@ PAYWALL_DOMAINS = [
     'engadget.com',         # Engadget
     'prnewswire.com',       # PR Newswire
     'vaticannews.va'        # Vatican News
+    'churchofjesuschrist.org',  # LDS Church News
     'globenewswire.com'     # GlobeNewswire (last item, no comma needed)
 ]
 
