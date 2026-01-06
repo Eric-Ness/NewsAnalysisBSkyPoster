@@ -194,6 +194,7 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
 13. Absolutely no articles from known fake news, unreliable sources or religious sites.
 14. News from religious sites is not acceptable unless it is a major world event covered by mainstream media.
 15. No Obituaries or memorials, unless they are of major public figures with significant societal impact.
+16. No .gov or .mil sites. 
  .
 
 Recent posts:
