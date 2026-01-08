@@ -209,8 +209,9 @@ SELECTION CRITERIA (in priority order):
 4. DIVERSITY: Pick stories covering different topics, not multiple articles about the same event
 
 MUST AVOID:
+- Corporate press releases, product announcements, or company earnings reports (these are PR, not news)
+- Stories that are essentially advertisements for a company's products, services, or achievements
 - Celebrity gossip, sports scores, or entertainment news (unless major cultural impact)
-- Press releases or promotional content disguised as news
 - Financial product promotions (loans, mortgages, credit cards)
 - Sales events or deal roundups (unless truly newsworthy like major economic events)
 - Obituaries (unless major public figures with societal impact)
