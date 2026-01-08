@@ -77,7 +77,8 @@ class NewsPoster:
                 news_candidates.append({
                     'URL': row['URL'],
                     'Title': row['Title'],
-                    'News_Feed_ID': row['News_Feed_ID']
+                    'News_Feed_ID': row['News_Feed_ID'],
+                    'Source_Count': row.get('Source_Count', 1)
                 })
             
             # Filter out articles from paywall domains

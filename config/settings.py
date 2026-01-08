@@ -179,6 +179,81 @@ PAYWALL_DOMAINS = [
 ]
 
 # =============================================================================
+# Blocked Domains for Article Selection
+# =============================================================================
+
+# Domains that should never be selected for posting (religious, government, unreliable)
+BLOCKED_DOMAINS = [
+    # Government domains (handled by regex, but explicit list for subdomains)
+    # Note: .gov and .mil TLDs are filtered by regex pattern in ai_service.py
+
+    # Religious news sites
+    "vaticannews.va",
+    "churchofjesuschrist.org",
+    "christianpost.com",
+    "christianitytoday.com",
+    "ncregister.com",           # National Catholic Register
+    "catholicnews.com",
+    "catholicnewsagency.com",
+    "ewtn.com",                 # Eternal Word Television Network
+    "religionnews.com",
+    "christianheadlines.com",
+    "crosswalk.com",
+    "desiringgod.org",
+    "relevantmagazine.com",
+    "sojo.net",                 # Sojourners
+    "firstthings.com",
+    "cruxnow.com",              # Catholic news
+    "americamagazine.org",      # Jesuit magazine
+    "ncronline.org",            # National Catholic Reporter
+    "charismanews.com",
+    "onenewsnow.com",           # American Family Association
+    "wnd.com",                  # WorldNetDaily
+    "lifesitenews.com",
+    "theblaze.com",
+    "cbn.com",                  # Christian Broadcasting Network
+    "jewishpress.com",
+    "timesofisrael.com",        # Often religious focus
+    "jpost.com",                # Jerusalem Post (mixed, but often religious)
+    "aljazeera.com",            # Can have religious bias
+    "islamonline.net",
+    "muslimmatters.org",
+
+    # Known unreliable/fake news sources
+    "infowars.com",
+    "naturalnews.com",
+    "breitbart.com",
+    "dailywire.com",
+    "thegatewaypundit.com",
+    "zerohedge.com",
+    "epochtimes.com",
+    "ntd.com",                  # New Tang Dynasty (Epoch Times affiliate)
+    "oann.com",                 # One America News Network
+    "newsmax.com",
+    "rt.com",                   # Russia Today
+    "sputniknews.com",
+    "globalresearch.ca",
+    "beforeitsnews.com",
+    "worldtruth.tv",
+    "yournewswire.com",
+    "neonnettle.com",
+
+    # Clickbait / Low quality
+    "buzzfeed.com",
+    "dailymail.co.uk",
+    "thesun.co.uk",
+    "nypost.com",               # Often sensational
+    "foxnews.com",              # High bias
+    "msnbc.com",                # High bias
+
+    # Press releases / PR sites
+    "prnewswire.com",
+    "globenewswire.com",
+    "businesswire.com",
+    "prweb.com",
+]
+
+# =============================================================================
 # Configuration Validation
 # =============================================================================
 

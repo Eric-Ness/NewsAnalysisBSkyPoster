@@ -130,6 +130,7 @@ The `tbl_Social_Posts` table captures all data needed to reproduce posts as embe
 
 ## Change Log
 
+**2026.01.08** – Improved AI article selection: added domain blocklist for religious/fake news/biased sites, pre-filter .gov/.mil URLs, pass Source_Count to AI for breaking news prioritization.
 **2025.12.18** – Configuration cleanup: extracted magic numbers to settings.py, added config validation, created custom exception classes.
 **2025.12.08** – Added social posts storage for embed support (tbl_Social_Posts table).
 **2025.09.25** – Updated Gemini Models List.  

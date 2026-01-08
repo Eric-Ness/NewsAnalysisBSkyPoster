@@ -161,9 +161,28 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             List[Dict]: The selected articles in priority order, empty list if no articles selected.
         """
         try:
+            # Pre-filter: Remove blocked domains before AI selection
+            # This ensures these are never selected regardless of AI behavior
+            def is_blocked_url(url: str) -> bool:
+                url_lower = url.lower()
+                # Check .gov and .mil TLDs
+                if re.search(r'\.gov(/|$|\.)', url_lower) or re.search(r'\.mil(/|$|\.)', url_lower):
+                    return True
+                # Check explicit blocklist
+                for domain in settings.BLOCKED_DOMAINS:
+                    if domain in url_lower:
+                        return True
+                return False
+
+            filtered_candidates = [c for c in candidates if not is_blocked_url(c.get('URL', ''))]
+
+            blocked_count = len(candidates) - len(filtered_candidates)
+            if blocked_count > 0:
+                logger.info(f"Filtered out {blocked_count} blocked domain URLs")
+
             # Take up to CANDIDATE_SELECTION_LIMIT items from the randomized list
             import random
-            random_candidates = candidates.copy()
+            random_candidates = filtered_candidates.copy()
             random.shuffle(random_candidates)
             candidate_list = random_candidates[:settings.CANDIDATE_SELECTION_LIMIT]
 
@@ -172,35 +191,35 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
                 f"- {post.title}" for post in recent_posts if post.title
             ])
 
-            # Generate a string of candidate titles and URLs
+            # Generate a string of candidate titles with source counts
+            # Format: [Sources: N] Title (URL)
             candidate_titles = "\n".join([
-                f"- {item['Title']} ({item['URL']})" for item in candidate_list
+                f"- [Sources: {item.get('Source_Count', 1)}] {item['Title']} ({item['URL']})"
+                for item in candidate_list
             ])
 
             # Create a prompt for selecting multiple newsworthy articles
-            prompt = f"""Select the {max_count} most newsworthy articles that:
-1. Have significant public interest or impact
-2. Represent meaningful developments rather than speculation
-3. Avoid sensationalism and clickbait
-4. Cover diverse topics (not all about the same subject)
-5. Imagine you are Edward R. Murrow, a legendary journalist known for his integrity and commitment to factual reporting.
-6. Prioritize articles that maybe breaking news or significant updates.
-7. Avoid articles that are probably pseudo-news, pseudo-science or speculative in nature.
-8. Nothing that is essentially a press release or promotional content.
-9. Nothing to do with celebrity gossip, sports, or entertainment unless it has significant societal impact.
-10. Avoid articles that are too similar to recent posts.
-11. Avoid articles that talk about loans, mortgages, or financial products unless they are significant news events.
-12. Avoid articles that feature sales for websites, products, or services unless they are significant news events. Like Amazon Prime Day or Black Friday.
-13. Absolutely no articles from known fake news, unreliable sources or religious sites.
-14. News from religious sites is not acceptable unless it is a major world event covered by mainstream media.
-15. No Obituaries or memorials, unless they are of major public figures with significant societal impact.
-16. No .gov or .mil sites. 
- .
+            # Note: Religious sites, fake news, .gov/.mil are pre-filtered by code
+            prompt = f"""You are a news editor selecting stories for a general audience. Select the {max_count} most newsworthy articles.
+
+SELECTION CRITERIA (in priority order):
+1. BREAKING/TRENDING: Stories with higher source counts (shown as [Sources: N]) indicate more outlets are covering it - these are likely breaking news or major stories. STRONGLY PREFER stories with Source counts > 1.
+2. IMPACT: Choose stories with significant public interest or real-world consequences
+3. CREDIBILITY: Select factual reporting, not opinion, speculation, or pseudo-science
+4. DIVERSITY: Pick stories covering different topics, not multiple articles about the same event
+
+MUST AVOID:
+- Celebrity gossip, sports scores, or entertainment news (unless major cultural impact)
+- Press releases or promotional content disguised as news
+- Financial product promotions (loans, mortgages, credit cards)
+- Sales events or deal roundups (unless truly newsworthy like major economic events)
+- Obituaries (unless major public figures with societal impact)
+- Articles too similar to the recent posts listed below
 
 Recent posts:
 {recent_titles}
 
-Candidates:
+Candidates (format: [Sources: count] Title (URL)):
 {candidate_titles}
 
 Return ONLY the URLs and Titles in this format, ordered from most to least important:
