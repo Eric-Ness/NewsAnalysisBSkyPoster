@@ -287,6 +287,36 @@ BLOCKED_DOMAINS = [
     "costco.com",
     "homedepot.com",
     "lowes.com",
+
+    # Mining / Commodities / Industrial
+    "glencore.com",
+    "riotinto.com",
+    "bhp.com",
+    "vale.com",
+    "angloamerican.com",
+    "freeportmcmoran.com",
+    "newmontcorp.com",
+    "barrick.com",
+    "caterpillar.com",
+    "deere.com",
+    "3m.com",
+    "honeywell.com",
+    "ge.com",
+    "siemens.com",
+]
+
+# PR-style title patterns that indicate corporate statements (case-insensitive)
+PR_TITLE_PATTERNS = [
+    r"^statement\s+(regarding|on|about)",      # "Statement regarding..."
+    r"^announcement\s*:",                       # "Announcement:"
+    r"^press\s+release\s*:",                    # "Press Release:"
+    r"^media\s+(release|statement)",            # "Media Release"
+    r"\bannounces\s+(q[1-4]|quarterly|annual|fiscal)",  # "announces Q1 results"
+    r"\breports\s+(q[1-4]|quarterly|annual|fiscal)",    # "reports quarterly earnings"
+    r"\b(q[1-4]|quarterly|annual)\s+(results|earnings|revenue)",  # "Q3 results"
+    r"investor\s+(update|call|presentation)",   # "Investor Update"
+    r"^notice\s+of\s+",                         # "Notice of AGM"
+    r"shareholder\s+(meeting|letter|update)",   # "Shareholder Meeting"
 ]
 
 # =============================================================================

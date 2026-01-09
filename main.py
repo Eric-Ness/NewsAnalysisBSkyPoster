@@ -10,6 +10,7 @@ Version: 5.0
 """
 
 import sys
+import re
 import argparse
 import logging
 import pandas as pd
@@ -147,8 +148,27 @@ class NewsPoster:
                     if real_url:
                         selected_article['URL'] = real_url
                         
-                        # Check if resolved URL is from a paywall domain
+                        # Check if resolved URL is from a paywall or blocked domain
                         try:
+                            real_url_lower = real_url.lower()
+
+                            # Check blocked domains (religious, fake news, corporate PR, etc.)
+                            is_blocked = False
+                            for blocked_domain in settings.BLOCKED_DOMAINS:
+                                if blocked_domain in real_url_lower:
+                                    logger.warning(f"Resolved URL is from blocked domain: {real_url} - matched: {blocked_domain}")
+                                    is_blocked = True
+                                    break
+
+                            # Check .gov and .mil TLDs
+                            if re.search(r'\.gov(/|$|\.)', real_url_lower) or re.search(r'\.mil(/|$|\.)', real_url_lower):
+                                logger.warning(f"Resolved URL is from .gov/.mil domain: {real_url}")
+                                is_blocked = True
+
+                            if is_blocked:
+                                continue
+
+                            # Check paywall domains
                             parsed_url = urlparse(real_url)
                             domain = parsed_url.netloc
                             # Extract base domain
@@ -157,7 +177,7 @@ class NewsPoster:
                                 base_domain = '.'.join(domain_parts[-2:])
                             else:
                                 base_domain = domain
-                                
+
                             if any(paywall_domain == base_domain for paywall_domain in settings.PAYWALL_DOMAINS):
                                 logger.warning(f"Resolved URL is from paywall domain: {real_url} - matched domain: {base_domain}")
                                 continue

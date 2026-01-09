@@ -161,7 +161,7 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             List[Dict]: The selected articles in priority order, empty list if no articles selected.
         """
         try:
-            # Pre-filter: Remove blocked domains before AI selection
+            # Pre-filter: Remove blocked domains and PR-style content before AI selection
             # This ensures these are never selected regardless of AI behavior
             def is_blocked_url(url: str) -> bool:
                 url_lower = url.lower()
@@ -174,11 +174,24 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
                         return True
                 return False
 
-            filtered_candidates = [c for c in candidates if not is_blocked_url(c.get('URL', ''))]
+            def is_pr_title(title: str) -> bool:
+                """Check if title matches PR/corporate statement patterns."""
+                title_lower = title.lower()
+                for pattern in settings.PR_TITLE_PATTERNS:
+                    if re.search(pattern, title_lower):
+                        return True
+                return False
 
-            blocked_count = len(candidates) - len(filtered_candidates)
-            if blocked_count > 0:
-                logger.info(f"Filtered out {blocked_count} blocked domain URLs")
+            # Filter blocked domains
+            filtered_candidates = [c for c in candidates if not is_blocked_url(c.get('URL', ''))]
+            domain_blocked = len(candidates) - len(filtered_candidates)
+
+            # Filter PR-style titles
+            filtered_candidates = [c for c in filtered_candidates if not is_pr_title(c.get('Title', ''))]
+            title_blocked = (len(candidates) - domain_blocked) - len(filtered_candidates)
+
+            if domain_blocked > 0 or title_blocked > 0:
+                logger.info(f"Filtered out {domain_blocked} blocked domains, {title_blocked} PR-style titles")
 
             # Take up to CANDIDATE_SELECTION_LIMIT items from the randomized list
             import random
