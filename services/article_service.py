@@ -47,14 +47,31 @@ class ArticleContent:
     news_feed_id: Optional[int] = None
 
 class ArticleService:
-    """Service for fetching and processing articles."""
-    
-    def __init__(self):
-        """Initialize the article service."""
-        self.url_history_file = settings.URL_HISTORY_FILE
-        self.max_history_lines = settings.MAX_HISTORY_LINES
-        self.cleanup_threshold = settings.CLEANUP_THRESHOLD
-        self.paywall_domains = settings.PAYWALL_DOMAINS
+    """Service for fetching and processing articles.
+
+    This service can be instantiated with custom configuration for dependency injection,
+    or use default values from settings for backward compatibility.
+    """
+
+    def __init__(
+        self,
+        url_history_file: Optional[str] = None,
+        max_history_lines: Optional[int] = None,
+        cleanup_threshold: Optional[int] = None,
+        paywall_domains: Optional[List[str]] = None
+    ):
+        """Initialize the article service.
+
+        Args:
+            url_history_file: Path to the URL history file. Defaults to settings.URL_HISTORY_FILE.
+            max_history_lines: Maximum number of lines in history file. Defaults to settings.MAX_HISTORY_LINES.
+            cleanup_threshold: Number of old entries to remove during cleanup. Defaults to settings.CLEANUP_THRESHOLD.
+            paywall_domains: List of paywall domain patterns. Defaults to settings.PAYWALL_DOMAINS.
+        """
+        self.url_history_file = url_history_file if url_history_file is not None else settings.URL_HISTORY_FILE
+        self.max_history_lines = max_history_lines if max_history_lines is not None else settings.MAX_HISTORY_LINES
+        self.cleanup_threshold = cleanup_threshold if cleanup_threshold is not None else settings.CLEANUP_THRESHOLD
+        self.paywall_domains = paywall_domains if paywall_domains is not None else settings.PAYWALL_DOMAINS
     
     def get_real_url(self, google_url: str) -> Optional[str]:
         """

@@ -9,7 +9,7 @@ HTTP responses, and data factories for test objects.
 import pytest
 from unittest.mock import MagicMock, patch
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import sys
 import os
 
@@ -586,3 +586,204 @@ def temp_url_history_with_data(tmp_path):
     ]
     history_file.write_text("\n".join(sample_urls))
     return history_file
+
+
+# =============================================================================
+# Dependency Injection Fixtures
+# =============================================================================
+
+class MockPostStorage:
+    """Mock implementation of PostStorage protocol for testing.
+
+    This class implements the PostStorage protocol interface, allowing
+    services to be tested without real database connections.
+
+    Usage:
+        def test_with_di(mock_post_storage):
+            service = SocialService(post_storage=mock_post_storage)
+            # ... test code
+            assert mock_post_storage.insert_called
+    """
+
+    def __init__(self):
+        """Initialize the mock storage with empty tracking lists."""
+        self.posts = []
+        self.insert_calls = []
+        self.get_calls = []
+        self._next_id = 1
+
+    def insert_social_post(self, post_data) -> Optional[int]:
+        """Mock insert that tracks calls and returns incrementing IDs.
+
+        Args:
+            post_data: SocialPostData object to insert.
+
+        Returns:
+            int: Mock post ID.
+        """
+        self.insert_calls.append(post_data)
+        self.posts.append({'id': self._next_id, 'data': post_data})
+        current_id = self._next_id
+        self._next_id += 1
+        return current_id
+
+    def get_social_post_by_id(self, social_post_id: int) -> Optional[Dict]:
+        """Mock get by ID.
+
+        Args:
+            social_post_id: ID to look up.
+
+        Returns:
+            dict or None: Mock post data if found.
+        """
+        self.get_calls.append(('by_id', social_post_id))
+        for post in self.posts:
+            if post['id'] == social_post_id:
+                return {'Social_Post_ID': post['id'], **vars(post['data'])}
+        return None
+
+    def get_recent_social_posts(
+        self,
+        platform: Optional[str] = None,
+        limit: int = 50
+    ) -> Optional[List[Dict]]:
+        """Mock get recent posts.
+
+        Args:
+            platform: Optional platform filter.
+            limit: Maximum number of posts.
+
+        Returns:
+            list: Mock post data list.
+        """
+        self.get_calls.append(('recent', platform, limit))
+        results = []
+        for post in self.posts[-limit:]:
+            if platform is None or post['data'].platform == platform:
+                results.append({'Social_Post_ID': post['id'], **vars(post['data'])})
+        return results
+
+    @property
+    def insert_called(self) -> bool:
+        """Check if insert was called."""
+        return len(self.insert_calls) > 0
+
+    def reset(self):
+        """Reset all tracking data."""
+        self.posts.clear()
+        self.insert_calls.clear()
+        self.get_calls.clear()
+        self._next_id = 1
+
+
+@pytest.fixture
+def mock_post_storage():
+    """
+    Provide a mock PostStorage implementation for DI testing.
+
+    This fixture creates a MockPostStorage instance that implements
+    the PostStorage protocol, enabling services to be tested without
+    a real database connection.
+
+    Usage:
+        def test_service_with_di(mock_post_storage):
+            service = SocialService(post_storage=mock_post_storage)
+            service.post_to_social("text", "url", "title")
+            assert mock_post_storage.insert_called
+
+    Returns:
+        MockPostStorage: A mock storage implementation.
+    """
+    return MockPostStorage()
+
+
+@pytest.fixture
+def article_service_with_di(tmp_path):
+    """
+    Create an ArticleService with DI configuration for testing.
+
+    This fixture creates an ArticleService instance with:
+    - A temporary URL history file
+    - Custom configuration values for testing
+
+    Usage:
+        def test_article_service(article_service_with_di):
+            service, history_file = article_service_with_di
+            # ... test code
+
+    Returns:
+        tuple: (ArticleService instance, path to history file)
+    """
+    from services.article_service import ArticleService
+
+    history_file = tmp_path / "test_history.txt"
+    history_file.write_text("")
+
+    service = ArticleService(
+        url_history_file=str(history_file),
+        max_history_lines=50,
+        cleanup_threshold=5,
+        paywall_domains=["test-paywall.com"]
+    )
+
+    return service, history_file
+
+
+@pytest.fixture
+def mock_social_service(mock_post_storage):
+    """
+    Create a mocked SocialService for DI testing.
+
+    This fixture provides a SocialService with:
+    - A mock AT Protocol client (no real authentication)
+    - Mock post storage
+
+    Note: The service is not fully initialized (no login),
+    suitable for testing posting logic in isolation.
+
+    Returns:
+        tuple: (SocialService instance, mock AT client, mock post storage)
+    """
+    from services.social_service import SocialService
+
+    mock_client = MagicMock()
+    mock_client.login.return_value = True
+
+    # Create service with injected dependencies
+    service = SocialService(
+        at_client=mock_client,
+        username="test-user",
+        password="test-password",
+        post_storage=mock_post_storage
+    )
+
+    return service, mock_client, mock_post_storage
+
+
+@pytest.fixture
+def mock_twitter_service(mock_post_storage):
+    """
+    Create a mocked TwitterService for DI testing.
+
+    This fixture provides a TwitterService with:
+    - A mock Tweepy client (no real authentication)
+    - Mock post storage
+
+    Returns:
+        tuple: (TwitterService instance, mock client, mock post storage)
+    """
+    from services.twitter_service import TwitterService
+
+    mock_client = MagicMock()
+
+    # Create service with injected dependencies
+    service = TwitterService(
+        api_key="test-api-key",
+        api_key_secret="test-api-secret",
+        access_token="test-access-token",
+        access_token_secret="test-access-secret",
+        post_storage=mock_post_storage,
+        client=mock_client
+    )
+
+    return service, mock_client, mock_post_storage

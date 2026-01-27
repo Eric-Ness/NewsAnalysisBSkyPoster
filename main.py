@@ -33,23 +33,41 @@ from services.twitter_service import TwitterService
 logger = get_logger(__name__)
 
 class NewsPoster:
-    """
-    Main application class for the News Poster.
-    
+    """Main application class for the News Poster.
+
     This class orchestrates the process of fetching, selecting,
     and posting news articles to social media.
+
+    Services can be injected via constructor for testing and flexibility,
+    or default implementations will be used for production.
     """
-    
-    def __init__(self):
-        """Initialize the News Poster application."""
-        # Initialize services
-        self.article_service = ArticleService()
-        self.ai_service = AIService()
-        self.social_service = SocialService()
-        self.twitter_service = TwitterService()
-        
-        # Validate settings
-        settings.validate_settings()
+
+    def __init__(
+        self,
+        article_service: Optional[ArticleService] = None,
+        ai_service: Optional[AIService] = None,
+        social_service: Optional[SocialService] = None,
+        twitter_service: Optional[TwitterService] = None,
+        validate: bool = True
+    ):
+        """Initialize the News Poster application.
+
+        Args:
+            article_service: Service for fetching articles. Defaults to new ArticleService.
+            ai_service: Service for AI operations. Defaults to new AIService.
+            social_service: Service for BlueSky posting. Defaults to new SocialService.
+            twitter_service: Service for Twitter posting. Defaults to new TwitterService.
+            validate: Whether to validate settings on init. Defaults to True.
+        """
+        # Initialize services (use provided or create defaults)
+        self.article_service = article_service if article_service is not None else ArticleService()
+        self.ai_service = ai_service if ai_service is not None else AIService()
+        self.social_service = social_service if social_service is not None else SocialService()
+        self.twitter_service = twitter_service if twitter_service is not None else TwitterService()
+
+        # Validate settings (can be skipped for testing)
+        if validate:
+            settings.validate_settings()
     
     def run(self, test_mode: bool = False, platforms: Optional[List[str]] = None) -> bool:
         """
@@ -286,6 +304,47 @@ class NewsPoster:
         except Exception as e:
             logger.error(f"Unexpected error in NewsAnalyzer process_news_feed: {e}", exc_info=True)
             return False
+
+
+def create_news_poster(
+    article_service: Optional[ArticleService] = None,
+    ai_service: Optional[AIService] = None,
+    social_service: Optional[SocialService] = None,
+    twitter_service: Optional[TwitterService] = None
+) -> NewsPoster:
+    """Factory function to create a NewsPoster with optional custom services.
+
+    This is a convenience function for creating a NewsPoster instance with
+    dependency injection. It validates settings and creates default services
+    for any that aren't provided.
+
+    Args:
+        article_service: Custom ArticleService instance.
+        ai_service: Custom AIService instance.
+        social_service: Custom SocialService instance.
+        twitter_service: Custom TwitterService instance.
+
+    Returns:
+        Configured NewsPoster instance.
+
+    Example:
+        # Production usage (all defaults):
+        poster = create_news_poster()
+
+        # Testing usage (with mock services):
+        poster = create_news_poster(
+            article_service=mock_article_service,
+            ai_service=mock_ai_service
+        )
+    """
+    return NewsPoster(
+        article_service=article_service,
+        ai_service=ai_service,
+        social_service=social_service,
+        twitter_service=twitter_service,
+        validate=True
+    )
+
 
 def parse_arguments():
     """Parse command line arguments."""

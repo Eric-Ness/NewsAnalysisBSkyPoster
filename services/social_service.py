@@ -18,36 +18,58 @@ from utils.logger import get_logger
 from utils.exceptions import AuthenticationError, PostingError, MediaUploadError, SocialMediaError
 from services.ai_service import FeedPost
 from data.database import db, SocialPostData
+from data.protocols import PostStorage
 
 logger = get_logger(__name__)
 
 class SocialService:
-    """Service for social media integrations with the AT Protocol (BlueSky)."""
-    
-    def __init__(self):
-        """Initialize the social service with AT Protocol client."""
-        self.at_client = Client()
-        self._setup_at_protocol()
-    
-    def _setup_at_protocol(self) -> bool:
+    """Service for social media integrations with the AT Protocol (BlueSky).
+
+    This service can be instantiated with custom dependencies for dependency injection,
+    or use default values for backward compatibility.
+    """
+
+    def __init__(
+        self,
+        at_client: Optional[Client] = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        post_storage: Optional[PostStorage] = None
+    ):
+        """Initialize the social service with AT Protocol client.
+
+        Args:
+            at_client: Pre-configured AT Protocol client. If None, a new Client is created.
+            username: AT Protocol username. Defaults to settings.AT_PROTOCOL_USERNAME.
+            password: AT Protocol password. Defaults to settings.AT_PROTOCOL_PASSWORD.
+            post_storage: Storage backend for posts (implements PostStorage protocol).
+                         Defaults to the global db instance. Pass None to skip storage.
         """
-        Set up AT Protocol authentication.
-        
+        self.at_client = at_client if at_client is not None else Client()
+        self._username = username if username is not None else settings.AT_PROTOCOL_USERNAME
+        self._password = password if password is not None else settings.AT_PROTOCOL_PASSWORD
+        # Use global db as default, but allow None to skip storage entirely
+        self._post_storage = post_storage if post_storage is not None else db
+
+        # Only setup auth if client was not pre-configured
+        if at_client is None:
+            self._setup_at_protocol()
+
+    def _setup_at_protocol(self) -> bool:
+        """Set up AT Protocol authentication.
+
         Returns:
             bool: True if authentication was successful, False otherwise.
         """
         try:
-            username = settings.AT_PROTOCOL_USERNAME
-            password = settings.AT_PROTOCOL_PASSWORD
-            
-            if not username or not password:
+            if not self._username or not self._password:
                 logger.error("Missing AT Protocol credentials")
                 return False
-                
-            self.at_client.login(username, password)
-            logger.info(f"Successfully logged in to AT Protocol as {username}")
+
+            self.at_client.login(self._username, self._password)
+            logger.info(f"Successfully logged in to AT Protocol as {self._username}")
             return True
-            
+
         except AuthenticationError:
             raise
         except Exception as e:
@@ -65,7 +87,7 @@ class SocialService:
             List[FeedPost]: A list of FeedPost objects representing the recent posts.
         """
         try:
-            profile = self.at_client.get_profile(settings.AT_PROTOCOL_USERNAME)
+            profile = self.at_client.get_profile(self._username)
             feed = self.at_client.get_author_feed(profile.did, limit=limit)
             
             posts = []
@@ -166,7 +188,7 @@ class SocialService:
             social_post_id = None
             try:
                 # Get profile info for author data
-                profile = self.at_client.get_profile(settings.AT_PROTOCOL_USERNAME)
+                profile = self.at_client.get_profile(self._username)
 
                 # Extract post ID and URI from response
                 post_uri = post_response.uri if hasattr(post_response, 'uri') else None
@@ -180,7 +202,7 @@ class SocialService:
                     uri_parts = post_uri.split('/')
                     if len(uri_parts) >= 5:
                         rkey = uri_parts[-1]
-                        post_url = f"https://bsky.app/profile/{settings.AT_PROTOCOL_USERNAME}/post/{rkey}"
+                        post_url = f"https://bsky.app/profile/{self._username}/post/{rkey}"
 
                 # Serialize facets to JSON if present
                 facets_json = None
@@ -195,7 +217,7 @@ class SocialService:
                     platform='bluesky',
                     post_id=post_cid or post_uri.split('/')[-1] if post_uri else str(datetime.now().timestamp()),
                     post_text=tweet_text,
-                    author_handle=settings.AT_PROTOCOL_USERNAME,
+                    author_handle=self._username,
                     created_at=datetime.now(),
                     post_uri=post_uri,
                     post_url=post_url,
@@ -215,12 +237,13 @@ class SocialService:
                     }) if post_uri or post_cid else None
                 )
 
-                # Insert into database
-                social_post_id = db.insert_social_post(post_data)
-                if social_post_id:
-                    logger.info(f"Stored BlueSky post in database - Social_Post_ID: {social_post_id}")
-                else:
-                    logger.warning("Failed to store BlueSky post in database")
+                # Insert into database (if storage is configured)
+                if self._post_storage is not None:
+                    social_post_id = self._post_storage.insert_social_post(post_data)
+                    if social_post_id:
+                        logger.info(f"Stored BlueSky post in database - Social_Post_ID: {social_post_id}")
+                    else:
+                        logger.warning("Failed to store BlueSky post in database")
 
             except Exception as e:
                 logger.error(f"Error storing post data in database: {e}")

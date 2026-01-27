@@ -30,48 +30,64 @@ class FeedPost:
     timestamp: datetime
 
 class AIService:
-    """Service for AI operations with Google's Gemini API."""
-    
-    def __init__(self):
+    """Service for AI operations with Google's Gemini API.
+
+    This service can be instantiated with custom configuration for dependency injection,
+    or use default values from settings for backward compatibility.
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model_preferences: Optional[List[str]] = None
+    ):
+        """Initialize the AI service with the Gemini API.
+
+        Args:
+            api_key: Google AI API key. Defaults to settings.GOOGLE_AI_API_KEY.
+            model_preferences: List of preferred model names in priority order.
+                              Defaults to settings.DEFAULT_AI_MODELS.
+
+        Raises:
+            ValueError: If API key is missing or no models are available.
+            AIServiceError: If initialization fails.
         """
-        Initialize the AI service with the Gemini API.
-        
-        Configures the API key and selects an appropriate model based on availability.
-        """
-        # Initialize Gemini AI
-        api_key = settings.GOOGLE_AI_API_KEY
+        # Use provided values or fall back to settings
+        api_key = api_key if api_key is not None else settings.GOOGLE_AI_API_KEY
+        model_preferences = model_preferences if model_preferences is not None else settings.DEFAULT_AI_MODELS
+
         if not api_key:
             raise ValueError("Missing required GOOGLE_AI_API_KEY")
-            
+
         genai.configure(api_key=api_key)
-        
+
         # Get available models
         try:
             models_list = genai.list_models()
             available_models = [m.name for m in models_list]
-            
+
             # Select a model based on preference order
             model_name = None
-            for preferred in settings.DEFAULT_AI_MODELS:
+            for preferred in model_preferences:
                 for available in available_models:
                     if preferred in available:
                         model_name = available
                         break
                 if model_name:
                     break
-                    
+
             if not model_name and len(available_models) > 0:
                 # If none of our preferred models are available, just use the first one
                 model_name = available_models[0]
-                
+
             if not model_name:
                 raise ValueError("No Gemini models available")
-            
+
             logger.info(f"Selected AI model: {model_name}")
-            
+
             # Initialize model with the complete model path
             self.model = genai.GenerativeModel(model_name=model_name)
-            
+
         except AIServiceError:
             raise
         except Exception as e:

@@ -6,7 +6,7 @@ It provides functionality for authenticating with Twitter,
 posting content, and retrieving tweet information.
 """
 
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Any
 from datetime import datetime
 import requests
 import json
@@ -18,23 +18,53 @@ from config import settings
 from utils.logger import get_logger
 from utils.exceptions import AuthenticationError, PostingError, MediaUploadError, SocialMediaError, RateLimitError
 from data.database import db, SocialPostData
+from data.protocols import PostStorage
 
 logger = get_logger(__name__)
 
 class TwitterService:
-    """Service for Twitter/X integration."""
-    
-    def __init__(self):
-        """Initialize the Twitter service with API authentication."""
-        self.api_key = settings.TWITTER_API_KEY
-        self.api_key_secret = settings.TWITTER_API_KEY_SECRET
-        self.access_token = settings.TWITTER_ACCESS_TOKEN
-        self.access_token_secret = settings.TWITTER_ACCESS_TOKEN_SECRET
-        self.bearer_token = settings.TWITTER_BEARER_TOKEN
-        self.client = None
-        
-        # Set up Twitter client
-        self._setup_twitter()
+    """Service for Twitter/X integration.
+
+    This service can be instantiated with custom dependencies for dependency injection,
+    or use default values from settings for backward compatibility.
+    """
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        api_key_secret: Optional[str] = None,
+        access_token: Optional[str] = None,
+        access_token_secret: Optional[str] = None,
+        bearer_token: Optional[str] = None,
+        post_storage: Optional[PostStorage] = None,
+        client: Optional[Any] = None
+    ):
+        """Initialize the Twitter service with API authentication.
+
+        Args:
+            api_key: Twitter API key. Defaults to settings.TWITTER_API_KEY.
+            api_key_secret: Twitter API key secret. Defaults to settings.TWITTER_API_KEY_SECRET.
+            access_token: Twitter access token. Defaults to settings.TWITTER_ACCESS_TOKEN.
+            access_token_secret: Twitter access token secret. Defaults to settings.TWITTER_ACCESS_TOKEN_SECRET.
+            bearer_token: Twitter bearer token. Defaults to settings.TWITTER_BEARER_TOKEN.
+            post_storage: Storage backend for posts (implements PostStorage protocol).
+                         Defaults to the global db instance. Pass None to skip storage.
+            client: Pre-configured Tweepy client. If provided, skips authentication setup.
+        """
+        self.api_key = api_key if api_key is not None else settings.TWITTER_API_KEY
+        self.api_key_secret = api_key_secret if api_key_secret is not None else settings.TWITTER_API_KEY_SECRET
+        self.access_token = access_token if access_token is not None else settings.TWITTER_ACCESS_TOKEN
+        self.access_token_secret = access_token_secret if access_token_secret is not None else settings.TWITTER_ACCESS_TOKEN_SECRET
+        self.bearer_token = bearer_token if bearer_token is not None else settings.TWITTER_BEARER_TOKEN
+        # Use global db as default, but allow None to skip storage entirely
+        self._post_storage = post_storage if post_storage is not None else db
+
+        # Use pre-configured client or set up authentication
+        if client is not None:
+            self.client = client
+        else:
+            self.client = None
+            self._setup_twitter()
         
     def _setup_twitter(self) -> bool:
         """
@@ -344,12 +374,13 @@ class TwitterService:
                         })
                     )
 
-                    # Insert into database
-                    social_post_id = db.insert_social_post(post_data)
-                    if social_post_id:
-                        logger.info(f"Stored Twitter post in database - Social_Post_ID: {social_post_id}")
-                    else:
-                        logger.warning("Failed to store Twitter post in database")
+                    # Insert into database (if storage is configured)
+                    if self._post_storage is not None:
+                        social_post_id = self._post_storage.insert_social_post(post_data)
+                        if social_post_id:
+                            logger.info(f"Stored Twitter post in database - Social_Post_ID: {social_post_id}")
+                        else:
+                            logger.warning("Failed to store Twitter post in database")
 
                 except Exception as e:
                     logger.error(f"Error storing tweet data in database: {e}")
