@@ -1,0 +1,62 @@
+{
+  "issue_number": 6,
+  "title": "Critical: Replace generic exception handling with specific exceptions",
+  "created_at": "2026-01-27T03:00:00Z",
+  "completed_at": "2026-01-27T03:15:00Z",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Replace generic exceptions in ai_service.py",
+      "description": "Replace 6 generic `except Exception` blocks with AIServiceError subclasses (AIServiceError, TweetGenerationError, ArticleSelectionError)",
+      "files": ["services/ai_service.py"],
+      "verification": "Run: python -c \"from services.ai_service import AIService; print('Import OK')\"",
+      "status": "completed",
+      "dependencies": []
+    },
+    {
+      "id": 2,
+      "title": "Replace generic exceptions in article_service.py",
+      "description": "Replace 6 generic `except Exception` blocks with ArticleError subclasses (ArticleFetchError, ArticleParseError, PaywallError)",
+      "files": ["services/article_service.py"],
+      "verification": "Run: python -c \"from services.article_service import ArticleService; print('Import OK')\"",
+      "status": "completed",
+      "dependencies": []
+    },
+    {
+      "id": 3,
+      "title": "Replace generic exceptions in social_service.py",
+      "description": "Replace 6 generic `except Exception` blocks with SocialMediaError subclasses (AuthenticationError, PostingError, MediaUploadError)",
+      "files": ["services/social_service.py"],
+      "verification": "Run: python -c \"from services.social_service import SocialService; print('Import OK')\"",
+      "status": "completed",
+      "dependencies": []
+    },
+    {
+      "id": 4,
+      "title": "Replace generic exceptions in twitter_service.py",
+      "description": "Replace 7 generic `except Exception` blocks with SocialMediaError subclasses (AuthenticationError, PostingError, RateLimitError, MediaUploadError)",
+      "files": ["services/twitter_service.py"],
+      "verification": "Run: python -c \"from services.twitter_service import TwitterService; print('Import OK')\"",
+      "status": "completed",
+      "dependencies": []
+    },
+    {
+      "id": 5,
+      "title": "Replace generic exceptions in database.py",
+      "description": "Replace generic exceptions with DatabaseError subclasses (ConnectionError, QueryError). Keep nested rollback exceptions generic to avoid masking original errors.",
+      "files": ["data/database.py"],
+      "verification": "Run: python -c \"from data.database import DatabaseConnection; print('Import OK')\"",
+      "status": "completed",
+      "dependencies": []
+    },
+    {
+      "id": 6,
+      "title": "Update main.py exception handling",
+      "description": "Update main.py to catch specific exception types from the service modules and handle them appropriately",
+      "files": ["main.py"],
+      "verification": "Run: python -c \"from main import NewsPoster; print('Import OK')\"",
+      "status": "completed",
+      "dependencies": [1, 2, 3, 4, 5]
+    }
+  ]
+}

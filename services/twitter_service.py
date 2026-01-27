@@ -16,6 +16,7 @@ import tweepy
 from services.ai_service import FeedPost
 from config import settings
 from utils.logger import get_logger
+from utils.exceptions import AuthenticationError, PostingError, MediaUploadError, SocialMediaError, RateLimitError
 from data.database import db, SocialPostData
 
 logger = get_logger(__name__)
@@ -71,6 +72,8 @@ class TwitterService:
                              "Please provide either OAuth 1.0a credentials or a Bearer Token.")
                 return False
                 
+        except AuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Failed to authenticate with Twitter: {e}")
             return False
@@ -176,6 +179,8 @@ class TwitterService:
             logger.info(f"Successfully retrieved {len(tweets)} recent tweets")
             return tweets
             
+        except SocialMediaError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching recent tweets: {e}")
             return []
@@ -253,6 +258,8 @@ class TwitterService:
                             # Clean up the temporary file
                             os.unlink(temp_filename)
 
+                    except MediaUploadError:
+                        raise
                     except Exception as e:
                         logger.warning(f"Failed to upload media: {e}")
 
@@ -349,6 +356,8 @@ class TwitterService:
 
             return True, social_post_id
 
+        except (PostingError, AuthenticationError, MediaUploadError, RateLimitError):
+            raise
         except Exception as e:
             logger.error(f"Error posting tweet: {e}")
             return False, None

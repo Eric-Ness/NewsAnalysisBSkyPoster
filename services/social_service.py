@@ -15,6 +15,7 @@ from atproto import Client, models
 
 from config import settings
 from utils.logger import get_logger
+from utils.exceptions import AuthenticationError, PostingError, MediaUploadError, SocialMediaError
 from services.ai_service import FeedPost
 from data.database import db, SocialPostData
 
@@ -47,6 +48,8 @@ class SocialService:
             logger.info(f"Successfully logged in to AT Protocol as {username}")
             return True
             
+        except AuthenticationError:
+            raise
         except Exception as e:
             logger.error(f"Failed to authenticate with AT Protocol: {e}")
             return False
@@ -101,6 +104,8 @@ class SocialService:
             logger.info(f"Successfully retrieved {len(posts)} recent posts")
             return posts
 
+        except SocialMediaError:
+            raise
         except Exception as e:
             logger.error(f"Error fetching recent posts: {e}")
             return []
@@ -133,6 +138,8 @@ class SocialService:
                     upload = self.at_client.com.atproto.repo.upload_blob(img_data)
                     thumb = upload.blob
                     thumb_blob_ref = str(thumb.ref) if hasattr(thumb, 'ref') else None
+                except MediaUploadError:
+                    raise
                 except Exception as e:
                     logger.warning(f"Failed to upload image: {e}")
 
@@ -220,6 +227,8 @@ class SocialService:
 
             return True, social_post_id
 
+        except (PostingError, AuthenticationError, MediaUploadError):
+            raise
         except Exception as e:
             logger.error(f"Error posting to AT Protocol: {e}")
-            return False, None 
+            return False, None

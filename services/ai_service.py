@@ -16,6 +16,7 @@ from atproto import models
 
 from config import settings
 from utils.logger import get_logger
+from utils.exceptions import AIServiceError, TweetGenerationError, ArticleSelectionError
 
 logger = get_logger(__name__)
 
@@ -70,9 +71,11 @@ class AIService:
             # Initialize model with the complete model path
             self.model = genai.GenerativeModel(model_name=model_name)
             
+        except AIServiceError:
+            raise
         except Exception as e:
             logger.error(f"Error initializing Gemini AI: {e}")
-            raise
+            raise AIServiceError(f"Failed to initialize AI service: {e}") from e
     
     def check_content_similarity(self, article_title: str, article_text: str, recent_posts: List[FeedPost]) -> bool:
         """
@@ -140,10 +143,14 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
                 result = response.text.strip().upper() == "SIMILAR"
                 logger.info(f"AI similarity check for '{article_title[:30]}...': {'SIMILAR' if result else 'DIFFERENT'}")
                 return result
+            except AIServiceError:
+                raise
             except Exception as e:
                 logger.error(f"Error in AI similarity check, defaulting to not similar: {e}")
                 return False
 
+        except AIServiceError:
+            raise
         except Exception as e:
             logger.error(f"Error checking content similarity: {e}")
             return False
@@ -294,9 +301,11 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
                 if selected_articles:
                     return selected_articles[:max_count]
                 
+            except ArticleSelectionError:
+                raise
             except Exception as e:
                 logger.error(f"Error parsing AI response for article selection: {e}")
-            
+
             # Fallback: use top candidates if AI selection fails
             logger.warning("Falling back to direct candidate selection")
             return [
@@ -308,6 +317,8 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
                 for item in candidate_list[:max_count]
             ]
 
+        except ArticleSelectionError:
+            raise
         except Exception as e:
             logger.error(f"Error selecting news articles: {e}")
             # Return a few random candidates as fallback
@@ -452,6 +463,8 @@ SUMMARY: [one sentence summary of the article]"""
                 'facets': facets
             }
                 
+        except TweetGenerationError:
+            raise
         except Exception as e:
             logger.error(f"Error generating tweet: {e}")
-            return None 
+            return None

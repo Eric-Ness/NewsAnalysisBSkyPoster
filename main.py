@@ -19,6 +19,9 @@ from urllib.parse import urlparse
 
 from config import settings
 from utils.logger import get_logger, setup_file_logging
+from utils.exceptions import (
+    NewsPosterError, AIServiceError, ArticleError, SocialMediaError, DatabaseError
+)
 from data.database import db
 from services.article_service import ArticleService, ArticleContent
 from services.ai_service import AIService, FeedPost
@@ -296,8 +299,23 @@ class NewsPoster:
             logger.error("All selected articles failed processing")
             return False
             
+        except AIServiceError as e:
+            logger.error(f"AI service error in news processing: {e}", exc_info=True)
+            return False
+        except ArticleError as e:
+            logger.error(f"Article processing error: {e}", exc_info=True)
+            return False
+        except SocialMediaError as e:
+            logger.error(f"Social media error: {e}", exc_info=True)
+            return False
+        except DatabaseError as e:
+            logger.error(f"Database error in news processing: {e}", exc_info=True)
+            return False
+        except NewsPosterError as e:
+            logger.error(f"News poster error: {e}", exc_info=True)
+            return False
         except Exception as e:
-            logger.error(f"Error in NewsAnalyzer process_news_feed: {e}", exc_info=True)
+            logger.error(f"Unexpected error in NewsAnalyzer process_news_feed: {e}", exc_info=True)
             return False
 
 def parse_arguments():

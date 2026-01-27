@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from config import settings
+from utils.exceptions import DatabaseError, QueryError
+from utils.exceptions import ConnectionError as DatabaseConnectionError
 
 
 @dataclass
@@ -60,6 +62,8 @@ class DatabaseConnection:
             self.conn.setdecoding(pyodbc.SQL_CHAR, encoding='utf-8')
             logger.info("Successfully connected to database")
             return True
+        except DatabaseConnectionError:
+            raise
         except Exception as e:
             logger.error(f"Failed to connect to database: {e}")
             self.conn = None
@@ -105,6 +109,8 @@ class DatabaseConnection:
                 self.conn.commit()
                 return []
                 
+        except (QueryError, DatabaseError):
+            raise
         except Exception as e:
             logger.error(f"Error executing query: {e}")
             try:
@@ -230,10 +236,12 @@ class DatabaseConnection:
                 
             return pd.read_sql(query, self.conn)
             
+        except (QueryError, DatabaseError):
+            raise
         except Exception as e:
             logger.error(f"Error retrieving news feed: {e}")
             return None
-    
+
     def update_news_feed_bluesky(self, news_feed_id: int, article_text: str, bsky_tweet: str, 
                          article_url: str, article_img: str) -> bool:
         """
@@ -269,6 +277,8 @@ class DatabaseConnection:
             logger.info(f"Successfully updated database for BlueSky post - news_feed_id: {news_feed_id}")
             return True
             
+        except (QueryError, DatabaseError):
+            raise
         except Exception as e:
             logger.error(f"Error updating news feed for BlueSky: {e}")
             try:
@@ -276,7 +286,7 @@ class DatabaseConnection:
             except Exception:
                 pass
             return False
-    
+
     def update_news_feed_twitter(self, news_feed_id: int, article_text: str, twitter_tweet: str, 
                           article_url: str, article_img: str) -> bool:
         """
@@ -312,6 +322,8 @@ class DatabaseConnection:
             logger.info(f"Successfully updated database for Twitter post - news_feed_id: {news_feed_id}")
             return True
             
+        except (QueryError, DatabaseError):
+            raise
         except Exception as e:
             logger.error(f"Error updating news feed for Twitter: {e}")
             try:
@@ -319,7 +331,7 @@ class DatabaseConnection:
             except Exception:
                 pass
             return False
-    
+
     def update_news_feed(self, news_feed_id: int, article_text: str, social_text: str, 
                          article_url: str, article_img: str, platform: str = "bluesky") -> bool:
         """
@@ -399,6 +411,8 @@ class DatabaseConnection:
                 return inserted_id
             return None
 
+        except (QueryError, DatabaseError):
+            raise
         except Exception as e:
             logger.error(f"Error inserting social post: {e}")
             try:

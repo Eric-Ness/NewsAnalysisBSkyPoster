@@ -22,6 +22,7 @@ from selenium.webdriver.common.by import By
 
 from config import settings
 from utils.logger import get_logger
+from utils.exceptions import ArticleFetchError, ArticleParseError, PaywallError, InsufficientContentError
 
 logger = get_logger(__name__)
 
@@ -83,10 +84,12 @@ class ArticleService:
             time.sleep(settings.SELENIUM_REDIRECT_TIMEOUT)  # Allow redirect to complete
             return driver.current_url
 
+        except ArticleFetchError:
+            raise
         except Exception as e:
             logger.error(f"Error extracting real URL: {e}")
             return None
-            
+
         finally:
             if driver:
                 driver.quit()
@@ -159,6 +162,8 @@ class ArticleService:
                 news_feed_id=news_feed_id
             )
 
+        except (ArticleFetchError, ArticleParseError, PaywallError, InsufficientContentError):
+            raise
         except Exception as e:
             logger.error(f"Error fetching article: {e} on URL {url}")
             return None
@@ -245,10 +250,12 @@ class ArticleService:
                 news_feed_id=news_feed_id
             )
             
+        except (ArticleFetchError, ArticleParseError):
+            raise
         except Exception as e:
             logger.error(f"Error in Selenium extraction: {e}")
             return None
-            
+
         finally:
             if driver:
                 driver.quit()
