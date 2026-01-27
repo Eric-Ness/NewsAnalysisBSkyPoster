@@ -193,11 +193,30 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             if domain_blocked > 0 or title_blocked > 0:
                 logger.info(f"Filtered out {domain_blocked} blocked domains, {title_blocked} PR-style titles")
 
-            # Take up to CANDIDATE_SELECTION_LIMIT items from the randomized list
+            # Prioritize breaking news (Source_Count > 1) while maintaining variety
             import random
-            random_candidates = filtered_candidates.copy()
-            random.shuffle(random_candidates)
-            candidate_list = random_candidates[:settings.CANDIDATE_SELECTION_LIMIT]
+
+            # Separate breaking news from regular articles
+            breaking_news = [c for c in filtered_candidates if c.get('Source_Count', 1) > 1]
+            regular_news = [c for c in filtered_candidates if c.get('Source_Count', 1) <= 1]
+
+            # Sort breaking news by Source_Count descending (highest priority first)
+            breaking_news.sort(key=lambda x: x.get('Source_Count', 1), reverse=True)
+
+            # Cap breaking news at 50% of slots to ensure variety
+            breaking_limit = min(len(breaking_news), settings.CANDIDATE_SELECTION_LIMIT // 2)
+            selected_breaking = breaking_news[:breaking_limit]
+
+            # Randomize regular news and fill remaining slots
+            random.shuffle(regular_news)
+            remaining_slots = settings.CANDIDATE_SELECTION_LIMIT - len(selected_breaking)
+            selected_regular = regular_news[:remaining_slots]
+
+            # Combine: breaking news first, then regular
+            candidate_list = selected_breaking + selected_regular
+
+            if len(selected_breaking) > 0:
+                logger.info(f"Breaking news prioritization: {len(selected_breaking)} breaking, {len(selected_regular)} regular candidates")
 
             # Generate a string of recent post titles
             recent_titles = "\n".join([
@@ -300,7 +319,7 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
                         'Title': item['Title'],
                         'News_Feed_ID': item['News_Feed_ID']
                     }
-                    for item in random_candidates[:max_count]
+                    for item in candidates[:max_count]
                 ]
             return []
     
