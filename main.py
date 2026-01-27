@@ -22,6 +22,7 @@ from utils.logger import get_logger, setup_file_logging
 from utils.exceptions import (
     NewsPosterError, AIServiceError, ArticleError, SocialMediaError, DatabaseError
 )
+from utils.helpers import is_domain_match, extract_base_domain
 from data.database import db
 from services.article_service import ArticleService, ArticleContent
 from services.ai_service import AIService, FeedPost
@@ -89,25 +90,11 @@ class NewsPoster:
             filtered_candidates = []
             for candidate in news_candidates:
                 url = candidate['URL']
-                # Extract domain from URL to check against paywall domains
-                try:
-                    parsed_url = urlparse(url)
-                    domain = parsed_url.netloc
-                    # Extract base domain (e.g., example.com from sub.example.com)
-                    domain_parts = domain.split('.')
-                    if len(domain_parts) > 1:
-                        base_domain = '.'.join(domain_parts[-2:])
-                    else:
-                        base_domain = domain
-                        
-                    if not any(paywall_domain == base_domain for paywall_domain in settings.PAYWALL_DOMAINS):
-                        filtered_candidates.append(candidate)
-                    else:
-                        logger.info(f"Filtering out paywall domain article: {candidate['Title']} ({url}) - matched domain: {base_domain}")
-                except Exception as e:
-                    logger.warning(f"Error parsing URL {url}: {e} - skipping domain check")
-                    # If we can't parse the URL, still include the candidate
+                # Check against paywall domains using secure domain matching
+                if not is_domain_match(url, settings.PAYWALL_DOMAINS):
                     filtered_candidates.append(candidate)
+                else:
+                    logger.info(f"Filtering out paywall domain article: {candidate['Title']} ({url})")
             
             # Log how many candidates were filtered out
             if len(news_candidates) != len(filtered_candidates):
@@ -146,46 +133,28 @@ class NewsPoster:
                     continue
                     
                 # 5. Get the real URL (if it's a Google News URL)
-                if "news.google.com" in selected_article['URL']:
+                # Use proper domain check to prevent bypass attacks
+                url_domain = extract_base_domain(selected_article['URL'])
+                if url_domain == "google.com" and "news.google.com" in selected_article['URL']:
                     real_url = self.article_service.get_real_url(selected_article['URL'])
                     if real_url:
                         selected_article['URL'] = real_url
-                        
-                        # Check if resolved URL is from a paywall or blocked domain
-                        try:
-                            real_url_lower = real_url.lower()
 
-                            # Check blocked domains (religious, fake news, corporate PR, etc.)
-                            is_blocked = False
-                            for blocked_domain in settings.BLOCKED_DOMAINS:
-                                if blocked_domain in real_url_lower:
-                                    logger.warning(f"Resolved URL is from blocked domain: {real_url} - matched: {blocked_domain}")
-                                    is_blocked = True
-                                    break
+                        # Check if resolved URL is from a blocked domain
+                        if is_domain_match(real_url, settings.BLOCKED_DOMAINS):
+                            logger.warning(f"Resolved URL is from blocked domain: {real_url}")
+                            continue
 
-                            # Check .gov and .mil TLDs
-                            if re.search(r'\.gov(/|$|\.)', real_url_lower) or re.search(r'\.mil(/|$|\.)', real_url_lower):
-                                logger.warning(f"Resolved URL is from .gov/.mil domain: {real_url}")
-                                is_blocked = True
+                        # Check .gov and .mil TLDs using proper domain extraction
+                        resolved_domain = extract_base_domain(real_url)
+                        if resolved_domain and (resolved_domain.endswith('.gov') or resolved_domain.endswith('.mil')):
+                            logger.warning(f"Resolved URL is from .gov/.mil domain: {real_url}")
+                            continue
 
-                            if is_blocked:
-                                continue
-
-                            # Check paywall domains
-                            parsed_url = urlparse(real_url)
-                            domain = parsed_url.netloc
-                            # Extract base domain
-                            domain_parts = domain.split('.')
-                            if len(domain_parts) > 1:
-                                base_domain = '.'.join(domain_parts[-2:])
-                            else:
-                                base_domain = domain
-
-                            if any(paywall_domain == base_domain for paywall_domain in settings.PAYWALL_DOMAINS):
-                                logger.warning(f"Resolved URL is from paywall domain: {real_url} - matched domain: {base_domain}")
-                                continue
-                        except Exception as e:
-                            logger.warning(f"Error parsing resolved URL {real_url}: {e}")
+                        # Check paywall domains
+                        if is_domain_match(real_url, settings.PAYWALL_DOMAINS):
+                            logger.warning(f"Resolved URL is from paywall domain: {real_url}")
+                            continue
                 
                 # 6. Fetch the selected article content
                 article_content = self.article_service.fetch_article(

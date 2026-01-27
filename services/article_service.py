@@ -23,6 +23,7 @@ from selenium.webdriver.common.by import By
 from config import settings
 from utils.logger import get_logger
 from utils.exceptions import ArticleFetchError, ArticleParseError, PaywallError, InsufficientContentError
+from utils.helpers import validate_url, is_domain_match
 
 logger = get_logger(__name__)
 
@@ -65,6 +66,12 @@ class ArticleService:
         Returns:
             Optional[str]: The real article URL, or None if an error occurred.
         """
+        # Validate URL before processing
+        is_valid, error = validate_url(google_url)
+        if not is_valid:
+            logger.warning(f"Invalid URL rejected in get_real_url: {google_url} - {error}")
+            return None
+
         driver = None
         try:
             chrome_options = Options()
@@ -105,24 +112,16 @@ class ArticleService:
         Returns:
             Optional[ArticleContent]: The parsed article content, or None if there was an error.
         """
-        # First check if URL is from a paywall domain and skip it entirely
-        try:
-            from urllib.parse import urlparse
-            parsed_url = urlparse(url)
-            domain = parsed_url.netloc
-            # Extract base domain
-            domain_parts = domain.split('.')
-            if len(domain_parts) > 1:
-                base_domain = '.'.join(domain_parts[-2:])
-            else:
-                base_domain = domain
-                
-            if any(paywall_domain == base_domain for paywall_domain in self.paywall_domains):
-                logger.warning(f"Skipping paywall domain article: {url} - matched domain: {base_domain}")
-                return None
-        except Exception as e:
-            logger.warning(f"Error parsing URL {url} for paywall check: {e}")
-            # Continue with the fetch attempt even if we can't check the domain
+        # Validate URL before processing
+        is_valid, error = validate_url(url)
+        if not is_valid:
+            logger.warning(f"Invalid URL rejected in fetch_article: {url} - {error}")
+            return None
+
+        # Check if URL is from a paywall domain
+        if is_domain_match(url, self.paywall_domains):
+            logger.warning(f"Skipping paywall domain article: {url}")
+            return None
             
         try:
             headers = {
@@ -171,14 +170,20 @@ class ArticleService:
     def _fetch_with_selenium(self, url: str, news_feed_id: Optional[int] = None) -> Optional[ArticleContent]:
         """
         Simplified Selenium fallback for paywall bypass.
-        
+
         Args:
             url (str): The URL of the article
             news_feed_id (Optional[int]): The ID of the news feed item
-            
+
         Returns:
             Optional[ArticleContent]: Article content if successful, None otherwise
         """
+        # Validate URL before processing
+        is_valid, error = validate_url(url)
+        if not is_valid:
+            logger.warning(f"Invalid URL rejected in _fetch_with_selenium: {url} - {error}")
+            return None
+
         driver = None
         try:
             # Set up Chrome options
@@ -226,9 +231,9 @@ class ArticleService:
                 logger.warning(f"Selenium extraction yielded insufficient content: {len(text.split())} words")
                 debug_dir = "debug_html"
                 os.makedirs(debug_dir, exist_ok=True)
-                
-                from urllib.parse import urlparse
-                domain = urlparse(url).netloc
+
+                from utils.helpers import extract_base_domain
+                domain = extract_base_domain(url) or "unknown"
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"{debug_dir}/{domain}_{timestamp}.html"
                 

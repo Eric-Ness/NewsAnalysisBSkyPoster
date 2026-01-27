@@ -17,6 +17,7 @@ from atproto import models
 from config import settings
 from utils.logger import get_logger
 from utils.exceptions import AIServiceError, TweetGenerationError, ArticleSelectionError
+from utils.helpers import is_domain_match, extract_base_domain
 
 logger = get_logger(__name__)
 
@@ -171,15 +172,12 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
             # Pre-filter: Remove blocked domains and PR-style content before AI selection
             # This ensures these are never selected regardless of AI behavior
             def is_blocked_url(url: str) -> bool:
-                url_lower = url.lower()
-                # Check .gov and .mil TLDs
-                if re.search(r'\.gov(/|$|\.)', url_lower) or re.search(r'\.mil(/|$|\.)', url_lower):
+                # Check .gov and .mil TLDs using proper domain extraction
+                domain = extract_base_domain(url)
+                if domain and (domain.endswith('.gov') or domain.endswith('.mil')):
                     return True
-                # Check explicit blocklist
-                for domain in settings.BLOCKED_DOMAINS:
-                    if domain in url_lower:
-                        return True
-                return False
+                # Check explicit blocklist with secure domain matching
+                return is_domain_match(url, settings.BLOCKED_DOMAINS)
 
             def is_pr_title(title: str) -> bool:
                 """Check if title matches PR/corporate statement patterns."""
