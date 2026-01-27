@@ -1,0 +1,20 @@
+{
+  "testing": {
+    "createTests": "ask",
+    "testFramework": "auto-detect"
+  },
+  "hooks": {
+    "codeSimplifier": {
+      "enabled": true,
+      "mode": "silent"
+    },
+    "testValidator": {
+      "enabled": true,
+      "runOn": ["phase-complete", "commit"]
+    }
+  },
+  "adr": {
+    "autoGenerate": true,
+    "directory": ".tiki/adr"
+  }
+}

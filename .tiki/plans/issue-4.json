@@ -1,0 +1,35 @@
+{
+  "issueNumber": 4,
+  "issueTitle": "Improve breaking news prioritization in article selection",
+  "approach": "Option 2 - Reserve slots for breaking news while maintaining randomization for regular articles",
+  "phases": [
+    {
+      "id": 1,
+      "title": "Add breaking news slot reservation logic",
+      "description": "Modify the candidate selection in ai_service.py to separate breaking news (Source_Count > 1) from regular articles, sort breaking news by Source_Count descending, cap at 50% of slots, and fill remainder with randomized regular articles.",
+      "files": ["services/ai_service.py"],
+      "verification": [
+        "Code compiles without syntax errors",
+        "Breaking news with Source_Count > 1 is separated from regular",
+        "Breaking news is sorted by Source_Count descending",
+        "Breaking news capped at CANDIDATE_SELECTION_LIMIT // 2",
+        "Regular articles are still randomized"
+      ],
+      "dependencies": []
+    },
+    {
+      "id": 2,
+      "title": "Add unit tests for breaking news prioritization",
+      "description": "Create or update tests to verify the breaking news prioritization logic works correctly with various Source_Count distributions.",
+      "files": ["tests/test_ai_service.py"],
+      "verification": [
+        "Tests pass for breaking news prioritization",
+        "Tests cover edge cases (all breaking, no breaking, exactly at cap)"
+      ],
+      "dependencies": [1]
+    }
+  ],
+  "createdAt": "2026-01-27T01:45:00Z",
+  "status": "shipped",
+  "shippedAt": "2026-01-27T02:00:00Z"
+}

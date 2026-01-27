@@ -1,0 +1,7 @@
+{
+  "currentPhase": 2,
+  "phases": [
+    {"number": 1, "status": "completed"},
+    {"number": 2, "status": "completed"}
+  ]
+}

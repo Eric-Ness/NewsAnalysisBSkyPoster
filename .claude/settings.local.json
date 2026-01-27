@@ -12,7 +12,10 @@
       "Bash(git add:*)",
       "Bash(git push)",
       "Bash(git commit:*)",
-      "Bash(gh issue list:*)"
+      "Bash(gh issue list:*)",
+      "Bash(gh label list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue close:*)"
     ],
     "deny": [],
     "ask": []
