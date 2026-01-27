@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/queue.schema.json",
+  "title": "Tiki Queue",
+  "description": "Schema for .tiki/queue/pending.json discovered items queue",
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "description": "Pending items discovered during execution",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the queue item"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["bug", "enhancement", "refactor", "documentation", "technical-debt", "question", "followup"],
+            "description": "Type of discovered item"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the item"
+          },
+          "discoveredAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the item was discovered"
+          },
+          "discoveredInIssue": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Issue number during which item was discovered"
+          },
+          "discoveredInPhase": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Phase number during which item was discovered"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Suggested priority level"
+          },
+          "relatedFiles": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Files related to this item"
+          },
+          "suggestedLabels": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Suggested GitHub labels"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "converted", "dismissed"],
+            "description": "Status of the queue item"
+          },
+          "convertedToIssue": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Issue number if converted to GitHub issue"
+          }
+        }
+      }
+    },
+    "lastUpdated": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the queue was last modified"
+    }
+  },
+  "additionalProperties": true
+}

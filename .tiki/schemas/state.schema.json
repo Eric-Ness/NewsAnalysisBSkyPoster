@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/state.schema.json",
+  "title": "Tiki Execution State",
+  "description": "Schema for .tiki/state/current.json active execution state",
+  "type": "object",
+  "required": ["status"],
+  "properties": {
+    "activeIssue": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "null" }
+      ],
+      "description": "Currently active GitHub issue number"
+    },
+    "currentPhase": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "null" }
+      ],
+      "description": "Currently executing phase number"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["idle", "executing", "paused", "failed"],
+      "description": "Current execution status"
+    },
+    "startedAt": {
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "null" }
+      ],
+      "description": "When execution started"
+    },
+    "lastActivity": {
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "null" }
+      ],
+      "description": "Timestamp of last activity"
+    },
+    "pausedAt": {
+      "oneOf": [
+        { "type": "string", "format": "date-time" },
+        { "type": "null" }
+      ],
+      "description": "When execution was paused"
+    },
+    "completedPhases": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 1 },
+      "description": "List of completed phase numbers"
+    },
+    "failedPhase": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "null" }
+      ],
+      "description": "Phase number that failed (if status is 'failed')"
+    },
+    "errorMessage": {
+      "type": "string",
+      "description": "Error message if execution failed"
+    }
+  },
+  "additionalProperties": true
+}

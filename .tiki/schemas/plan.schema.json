@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/plan.schema.json",
+  "title": "Tiki Issue Plan",
+  "description": "Schema for .tiki/plans/issue-N.json phased execution plans",
+  "type": "object",
+  "required": ["issue", "phases"],
+  "properties": {
+    "issue": {
+      "type": "object",
+      "description": "GitHub issue metadata",
+      "required": ["number", "title"],
+      "properties": {
+        "number": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "GitHub issue number"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Issue title"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Full GitHub issue URL"
+        }
+      }
+    },
+    "created": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Plan creation timestamp"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["planned", "in_progress", "completed", "failed", "paused"],
+      "description": "Overall plan status"
+    },
+    "successCriteria": {
+      "type": "array",
+      "description": "Success criteria derived from issue requirements",
+      "items": {
+        "type": "object",
+        "required": ["category", "description"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["functional", "non-functional", "testing", "documentation"],
+            "description": "Criteria category"
+          },
+          "id": {
+            "type": "string",
+            "description": "Optional explicit ID (e.g., 'functional-1')"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the criterion"
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Assumptions made during planning",
+      "items": {
+        "type": "object",
+        "required": ["id", "confidence", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^A[0-9]+$",
+            "description": "Assumption identifier (e.g., 'A1', 'A2')"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Confidence level in the assumption"
+          },
+          "description": {
+            "type": "string",
+            "description": "What is being assumed"
+          },
+          "source": {
+            "type": "string",
+            "description": "Evidence or reasoning for the assumption"
+          },
+          "affectsPhases": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 },
+            "description": "Phase numbers affected by this assumption"
+          }
+        }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "description": "Execution phases",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["number", "title", "status", "content"],
+        "properties": {
+          "number": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Phase number (1-indexed)"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Brief phase title"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "in_progress", "completed", "failed", "skipped"],
+            "description": "Phase execution status"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Phase priority level"
+          },
+          "addressesCriteria": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Success criteria IDs this phase addresses"
+          },
+          "dependencies": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 },
+            "description": "Phase numbers that must complete first"
+          },
+          "files": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Files to be created or modified"
+          },
+          "content": {
+            "type": "string",
+            "description": "Detailed phase instructions for sub-agent"
+          },
+          "verification": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Verification steps to confirm phase completion"
+          },
+          "summary": {
+            "oneOf": [
+              { "type": "string" },
+              { "type": "null" }
+            ],
+            "description": "Summary of what was accomplished (filled after completion)"
+          },
+          "completedAt": {
+            "oneOf": [
+              { "type": "string", "format": "date-time" },
+              { "type": "null" }
+            ],
+            "description": "Timestamp when phase completed"
+          }
+        }
+      }
+    },
+    "coverageMatrix": {
+      "type": "object",
+      "description": "Maps criteria IDs to phases that address them",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "phases": {
+            "type": "array",
+            "items": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    },
+    "addressesRequirements": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Requirement IDs from requirements.json this issue addresses"
+    },
+    "release": {
+      "type": "object",
+      "description": "Release association",
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+(\\.[0-9]+)?$",
+          "description": "Target release version (e.g., 'v1.3')"
+        },
+        "milestone": {
+          "type": "string",
+          "format": "uri",
+          "description": "GitHub milestone URL"
+        }
+      }
+    },
+    "projectContext": {
+      "type": "object",
+      "description": "Context from PROJECT.md if present"
+    },
+    "researchContext": {
+      "type": "object",
+      "description": "Context from matched research documents"
+    },
+    "knowledgeContext": {
+      "type": "object",
+      "description": "Context from matched knowledge entries",
+      "properties": {
+        "matched": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "IDs of matched knowledge entries"
+        },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Keywords extracted from issue"
+        },
+        "displayed": {
+          "type": "boolean",
+          "description": "Whether matches were shown to user"
+        }
+      }
+    },
+    "queue": {
+      "type": "array",
+      "description": "Items discovered during planning for later review",
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "description": { "type": "string" },
+          "discoveredInPhase": { "type": "integer" }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Plan metadata",
+      "properties": {
+        "estimatedPhases": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Original estimated number of phases"
+        },
+        "actualPhases": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Actual number of phases"
+        },
+        "parallelizable": {
+          "type": "boolean",
+          "description": "Whether phases can run in parallel"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

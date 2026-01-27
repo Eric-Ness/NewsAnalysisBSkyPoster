@@ -1,0 +1,35 @@
+{
+  "version": "v1.0.0",
+  "createdAt": "2026-01-27T00:00:00.000Z",
+  "status": "active",
+  "requirementsEnabled": false,
+  "githubMilestone": {
+    "number": 1,
+    "url": "https://github.com/Eric-Ness/NewsAnalysisBSkyPoster/milestone/1"
+  },
+  "issues": [
+    {
+      "number": 10,
+      "title": "Add requirements.txt with pinned dependencies",
+      "status": "not_planned",
+      "requirements": [],
+      "currentPhase": null,
+      "totalPhases": null,
+      "completedAt": null
+    },
+    {
+      "number": 14,
+      "title": "Add architecture documentation and diagrams",
+      "status": "not_planned",
+      "requirements": [],
+      "currentPhase": null,
+      "totalPhases": null,
+      "completedAt": null
+    }
+  ],
+  "requirements": {
+    "total": 0,
+    "implemented": 0,
+    "verified": 0
+  }
+}

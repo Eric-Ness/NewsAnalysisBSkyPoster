@@ -18,7 +18,10 @@
       "Bash(gh issue close:*)",
       "Bash(awk:*)",
       "Bash(python:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git clone:*)",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []

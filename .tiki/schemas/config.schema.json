@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tiki.dev/schemas/config.schema.json",
+  "title": "Tiki Configuration",
+  "description": "Schema for .tiki/config.json project configuration",
+  "type": "object",
+  "properties": {
+    "testing": {
+      "type": "object",
+      "description": "Test-related configuration",
+      "properties": {
+        "createTests": {
+          "type": "string",
+          "enum": ["before", "after", "ask", "never"],
+          "description": "When to create tests: before (TDD), after, ask, or never"
+        },
+        "testFramework": {
+          "type": "string",
+          "description": "Test framework to use (e.g., 'auto-detect', 'jest', 'mocha')"
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "description": "Lifecycle hooks configuration",
+      "properties": {
+        "codeSimplifier": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "mode": {
+              "type": "string",
+              "enum": ["silent", "verbose", "prompt"]
+            }
+          }
+        },
+        "testValidator": {
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "runOn": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["phase-complete", "commit", "ship"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "adr": {
+      "type": "object",
+      "description": "Architecture Decision Records configuration",
+      "properties": {
+        "autoGenerate": {
+          "type": "boolean",
+          "description": "Automatically generate ADRs for significant decisions"
+        },
+        "directory": {
+          "type": "string",
+          "description": "Directory to store ADR files"
+        }
+      }
+    },
+    "autoFix": {
+      "type": "object",
+      "description": "Auto-fix configuration for failed phases",
+      "properties": {
+        "enabled": {
+          "oneOf": [
+            { "type": "boolean" },
+            { "type": "string", "enum": ["prompt"] }
+          ],
+          "description": "Enable auto-fix: true, false, or 'prompt'"
+        },
+        "maxAttempts": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum auto-fix attempts before giving up"
+        },
+        "strategies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["direct", "contextual-analysis", "approach-review"]
+          },
+          "description": "Auto-fix strategies to try in order"
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "description": "Workflow behavior configuration",
+      "properties": {
+        "showNextStepMenu": {
+          "type": "boolean",
+          "description": "Show menu of next steps after phase completion"
+        }
+      }
+    },
+    "pickIssue": {
+      "type": "object",
+      "description": "Configuration for /tiki:pick-issue command",
+      "properties": {
+        "maxIssues": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of issues to analyze"
+        },
+        "preferLabels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Labels that increase issue priority"
+        },
+        "deferLabels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Labels that decrease issue priority"
+        },
+        "excludeLabels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Labels that exclude issues from consideration"
+        }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "description": "Knowledge capture configuration",
+      "properties": {
+        "autoCapture": {
+          "type": "boolean",
+          "description": "Enable automatic knowledge capture during execution"
+        },
+        "minPhasesForCapture": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Minimum phases for auto-capture on ship"
+        },
+        "captureOnShip": {
+          "type": "boolean",
+          "description": "Auto-generate knowledge entry when shipping issues"
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
