@@ -10,35 +10,16 @@ import pyodbc
 import pandas as pd
 import logging
 from typing import Optional, List, Dict
-from dataclasses import dataclass
-from datetime import datetime
 
 from config import settings
 from utils.exceptions import DatabaseError, QueryError
 from utils.exceptions import ConnectionError as DatabaseConnectionError
 
+# Import SocialPostData from models and re-export for backward compatibility
+from data.models import SocialPostData
 
-@dataclass
-class SocialPostData:
-    """Data class for social media post information."""
-    platform: str                      # 'bluesky' or 'twitter'
-    post_id: str                       # Platform's unique post ID
-    post_text: str                     # The actual post text
-    author_handle: str                 # @handle
-    created_at: datetime               # When post was created
-    post_uri: Optional[str] = None     # Full URI (BlueSky at:// URIs)
-    post_url: Optional[str] = None     # Direct web URL to the post
-    author_display_name: Optional[str] = None
-    author_avatar_url: Optional[str] = None
-    author_did: Optional[str] = None   # BlueSky DID
-    post_facets: Optional[str] = None  # JSON string of facets
-    article_url: Optional[str] = None
-    article_title: Optional[str] = None
-    article_description: Optional[str] = None
-    article_image_url: Optional[str] = None
-    article_image_blob: Optional[str] = None
-    news_feed_id: Optional[int] = None
-    raw_response: Optional[str] = None # JSON string of full API response
+# Re-export for backward compatibility (allows: from data.database import SocialPostData)
+__all__ = ['DatabaseConnection', 'SocialPostData', 'db']
 
 logger = logging.getLogger(__name__)
 

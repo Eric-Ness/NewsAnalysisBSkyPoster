@@ -1,0 +1,39 @@
+{
+  "issue_number": 7,
+  "title": "Refactor: Split large configuration and database files",
+  "approach": "middle-ground",
+  "phases": [
+    {
+      "number": 1,
+      "title": "Extract SocialPostData to data/models.py",
+      "description": "Extract the SocialPostData dataclass from database.py to a dedicated models file",
+      "risk": "low",
+      "files_to_create": ["data/models.py"],
+      "files_to_modify": ["data/database.py"],
+      "verification": "Run tests to ensure SocialPostData is importable from both locations"
+    },
+    {
+      "number": 2,
+      "title": "Extract validation logic to config/validators.py",
+      "description": "Extract ConfigurationError and validate_settings() from settings.py",
+      "risk": "low",
+      "files_to_create": ["config/validators.py"],
+      "files_to_modify": ["config/settings.py"],
+      "verification": "Run tests to ensure validation works correctly"
+    },
+    {
+      "number": 3,
+      "title": "Extract domain lists to config/domain_lists.py",
+      "description": "Extract PAYWALL_DOMAINS, BLOCKED_DOMAINS, and PR_TITLE_PATTERNS",
+      "risk": "medium",
+      "files_to_create": ["config/domain_lists.py"],
+      "files_to_modify": ["config/settings.py"],
+      "verification": "Run tests to ensure domain filtering works correctly"
+    }
+  ],
+  "backward_compatibility": {
+    "strategy": "re-exports",
+    "details": "All extracted items will be re-exported from their original locations"
+  },
+  "created_at": "2026-01-27T14:00:00Z"
+}
