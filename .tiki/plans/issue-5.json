@@ -1,0 +1,123 @@
+{
+  "issueNumber": 5,
+  "title": "Critical: Add comprehensive test coverage for all services",
+  "createdAt": "2026-01-27T05:00:00Z",
+  "totalPhases": 6,
+  "phases": [
+    {
+      "number": 1,
+      "title": "Setup test infrastructure and shared fixtures",
+      "description": "Add pytest and pytest-cov to requirements.txt. Create tests/conftest.py with shared fixtures for mocking database connections, HTTP responses, settings/config, and logger suppression. Establish consistent test patterns.",
+      "status": "completed",
+      "summary": "Added pytest, pytest-cov, pytest-mock to requirements.txt. Created conftest.py with 12 shared fixtures including mock_settings, mock_db_connection, mock_logger, mock_http_response, social_post_data_factory, and more.",
+      "files": [
+        "requirements.txt",
+        "tests/conftest.py"
+      ],
+      "dependencies": [],
+      "verification": [
+        "pytest and pytest-cov are in requirements.txt",
+        "conftest.py exists with fixtures for mock_db_connection, mock_settings, mock_logger",
+        "Running `pytest --collect-only` shows fixtures are available"
+      ],
+      "estimatedTests": 0
+    },
+    {
+      "number": 2,
+      "title": "Add unit tests for DatabaseConnection",
+      "description": "Create tests/test_database.py with comprehensive tests for the database layer. Test connect/close, execute_query, get_news_feed (with category allocation logic), insert_social_post, and error handling with DatabaseError, QueryError, ConnectionError.",
+      "status": "completed",
+      "summary": "Created tests/test_database.py with 44 tests covering connection management, query execution, news feed operations, and social post operations. All tests pass.",
+      "files": [
+        "tests/test_database.py"
+      ],
+      "dependencies": [1],
+      "verification": [
+        "tests/test_database.py exists",
+        "Tests cover connect(), close(), execute_query(), get_news_feed(), insert_social_post()",
+        "Tests verify exception handling for DatabaseError, QueryError, ConnectionError",
+        "All tests pass: pytest tests/test_database.py -v"
+      ],
+      "estimatedTests": 20
+    },
+    {
+      "number": 3,
+      "title": "Add unit tests for ArticleService",
+      "description": "Create tests/test_article_service.py with tests for URL resolution, article fetching, paywall detection, and URL history management. Mock Selenium WebDriver and newspaper3k Article. Test error paths with ArticleFetchError, PaywallError, InsufficientContentError.",
+      "status": "completed",
+      "summary": "Created tests/test_article_service.py with 28 tests covering URL resolution, article fetching, Selenium fallback, paywall detection, URL history management, and error handling.",
+      "files": [
+        "tests/test_article_service.py"
+      ],
+      "dependencies": [1],
+      "verification": [
+        "tests/test_article_service.py exists",
+        "Tests cover get_real_url(), fetch_article(), is_url_in_history(), paywall detection",
+        "Tests verify exception handling for ArticleFetchError, PaywallError, InsufficientContentError",
+        "All tests pass: pytest tests/test_article_service.py -v"
+      ],
+      "estimatedTests": 20
+    },
+    {
+      "number": 4,
+      "title": "Add unit tests for SocialService (BlueSky)",
+      "description": "Create tests/test_social_service.py with tests for BlueSky AT Protocol authentication, posting with embedded articles, and feed retrieval. Mock atproto.Client and database interactions. Test error paths with AuthenticationError, PostingError, MediaUploadError.",
+      "status": "completed",
+      "summary": "Created tests/test_social_service.py with 34 tests covering authentication, feed retrieval, posting, image upload, and error handling. Tests integrate with conftest.py fixtures.",
+      "files": [
+        "tests/test_social_service.py"
+      ],
+      "dependencies": [1, 2],
+      "verification": [
+        "tests/test_social_service.py exists",
+        "Tests cover _setup_at_protocol(), get_recent_posts(), post_to_social()",
+        "Tests verify exception handling for AuthenticationError, PostingError, MediaUploadError",
+        "All tests pass: pytest tests/test_social_service.py -v"
+      ],
+      "estimatedTests": 16
+    },
+    {
+      "number": 5,
+      "title": "Add unit tests for TwitterService",
+      "description": "Create tests/test_twitter_service.py with tests for Twitter API authentication (OAuth 1.0a and Bearer Token), posting tweets, and timeline retrieval. Mock tweepy Client and database interactions. Test error paths with AuthenticationError, PostingError, RateLimitError.",
+      "status": "completed",
+      "summary": "Created tests/test_twitter_service.py with 35 tests covering both OAuth 1.0a and Bearer Token authentication, tweet retrieval, posting, rate limiting, media upload, and error handling.",
+      "files": [
+        "tests/test_twitter_service.py"
+      ],
+      "dependencies": [1, 2],
+      "verification": [
+        "tests/test_twitter_service.py exists",
+        "Tests cover _setup_twitter(), get_recent_tweets(), post_tweet()",
+        "Tests verify both OAuth 1.0a and Bearer Token authentication paths",
+        "Tests verify exception handling for AuthenticationError, PostingError, RateLimitError",
+        "All tests pass: pytest tests/test_twitter_service.py -v"
+      ],
+      "estimatedTests": 22
+    },
+    {
+      "number": 6,
+      "title": "Verify coverage and address gaps",
+      "description": "Run pytest with coverage reporting. Analyze coverage report to identify any gaps. Add additional tests if needed to reach 60% minimum coverage target. Generate final coverage report.",
+      "status": "completed",
+      "summary": "Coverage analysis complete: 83% overall (exceeds 60% target). Target services: database.py 95%, article_service.py 93%, social_service.py 95%, twitter_service.py 90%. 151 tests passing.",
+      "files": [],
+      "dependencies": [1, 2, 3, 4, 5],
+      "verification": [
+        "pytest --cov=. --cov-report=term-missing runs successfully",
+        "Overall code coverage is at least 60%",
+        "Coverage report shows all 4 services have meaningful test coverage"
+      ],
+      "estimatedTests": 5
+    }
+  ],
+  "metadata": {
+    "totalEstimatedTests": 83,
+    "targetCoverage": 60,
+    "existingTests": 12,
+    "servicesCount": 4,
+    "actualTests": 151,
+    "actualCoverage": 83,
+    "completedAt": "2026-01-27T05:30:00Z"
+  }
+}
