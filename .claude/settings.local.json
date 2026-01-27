@@ -15,7 +15,10 @@
       "Bash(gh issue list:*)",
       "Bash(gh label list:*)",
       "Bash(gh issue view:*)",
-      "Bash(gh issue close:*)"
+      "Bash(gh issue close:*)",
+      "Bash(awk:*)",
+      "Bash(python:*)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": []

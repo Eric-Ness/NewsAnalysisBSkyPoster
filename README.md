@@ -130,16 +130,20 @@ The `tbl_Social_Posts` table captures all data needed to reproduce posts as embe
 
 ## Change Log
 
+**2026.01.27** – Implemented dependency injection for better testability: added Protocol interfaces, refactored all services for constructor injection, added MockPostStorage for testing.
+**2026.01.27** – Added URL validation and sanitization to prevent SSRF attacks.
+**2026.01.26** – Refactored large configuration and database files for better maintainability.
+**2026.01.26** – Added comprehensive test coverage for all services (151 tests).
 **2026.01.08** – Improved AI article selection: added domain blocklist for religious/fake news/biased sites, pre-filter .gov/.mil URLs, pass Source_Count to AI for breaking news prioritization.
 **2025.12.18** – Configuration cleanup: extracted magic numbers to settings.py, added config validation, created custom exception classes.
 **2025.12.08** – Added social posts storage for embed support (tbl_Social_Posts table).
-**2025.09.25** – Updated Gemini Models List.  
-**2025.08.05** – feat: Add PR Newswire to paywall domains list and increase total results in SQL query.  
-**2025.07.06** – Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day.  
-**2025.04.21** – Updated data retrieval – world news 50%, national 40%, business 10%.  
-**2025.04.19** – Re-added hashtag creation.  
-**2025.04.18** – Bug fix for paywalled sites. Added government sites to block.  
-**2025.04.14** – Major restructure, no longer a monolith py file.  
-**2025.04.13** – Keep track of bsky posts, extracted article text, and pertinent URLs.  
-**2025.04.11** – Increased amount of news LLM could choose from 120 to 160 news items.  
+**2025.09.25** – Updated Gemini Models List.
+**2025.08.05** – feat: Add PR Newswire to paywall domains list and increase total results in SQL query.
+**2025.07.06** – Blacklisted a couple of sites and trying to avoid sales articles like Amazon Prime Day.
+**2025.04.21** – Updated data retrieval – world news 50%, national 40%, business 10%.
+**2025.04.19** – Re-added hashtag creation.
+**2025.04.18** – Bug fix for paywalled sites. Added government sites to block.
+**2025.04.14** – Major restructure, no longer a monolith py file.
+**2025.04.13** – Keep track of bsky posts, extracted article text, and pertinent URLs.
+**2025.04.11** – Increased amount of news LLM could choose from 120 to 160 news items.
 **2025.04.10** – Added business news to the data feed.
