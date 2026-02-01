@@ -1,0 +1,32 @@
+{
+  "version": "v1.0.1",
+  "createdAt": "2026-02-01T15:05:32.959Z",
+  "status": "active",
+  "requirementsEnabled": false,
+  "githubMilestone": null,
+  "issues": [
+    {
+      "number": 17,
+      "title": "google.generativeai issue",
+      "status": "shipped",
+      "requirements": [],
+      "currentPhase": null,
+      "totalPhases": 2,
+      "completedAt": "2026-02-01T15:38:52.000Z"
+    },
+    {
+      "number": 16,
+      "title": "Twitter",
+      "status": "shipped",
+      "requirements": [],
+      "currentPhase": null,
+      "totalPhases": 4,
+      "completedAt": "2026-02-01T17:09:30.000Z"
+    }
+  ],
+  "requirements": {
+    "total": 0,
+    "implemented": 0,
+    "verified": 0
+  }
+}

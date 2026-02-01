@@ -5,7 +5,8 @@
     "url": "https://github.com/Eric-Ness/NewsAnalysisBSkyPoster/issues/16"
   },
   "created": "2026-02-01T17:00:14.914Z",
-  "status": "completed",
+  "status": "shipped",
+  "shippedAt": "2026-02-01T17:09:30.000Z",
   "successCriteria": [
     {
       "category": "functional",
