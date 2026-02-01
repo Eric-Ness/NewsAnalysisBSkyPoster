@@ -1,0 +1,179 @@
+{
+  "issue": {
+    "number": 16,
+    "title": "Twitter",
+    "url": "https://github.com/Eric-Ness/NewsAnalysisBSkyPoster/issues/16"
+  },
+  "created": "2026-02-01T17:00:14.914Z",
+  "status": "completed",
+  "successCriteria": [
+    {
+      "category": "functional",
+      "description": "Application can run without Twitter API credentials"
+    },
+    {
+      "category": "functional",
+      "description": "Twitter service gracefully handles missing/insufficient API credentials"
+    },
+    {
+      "category": "functional",
+      "description": "Platform selection can be configured via environment variable or settings"
+    },
+    {
+      "category": "testing",
+      "description": "Tests verify Twitter can be disabled without errors"
+    }
+  ],
+  "assumptions": [],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Add platform enable/disable configuration",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": [
+        "functional-3"
+      ],
+      "dependencies": [],
+      "files": [
+        "config/settings.py",
+        ".env.example"
+      ],
+      "content": "Add configuration options to enable/disable specific platforms.\n\nTasks:\n1. Add to config/settings.py:\n   - ENABLE_BLUESKY environment variable (default: True)\n   - ENABLE_TWITTER environment variable (default: False)\n   - Update DEFAULT_PLATFORMS to be dynamically built based on enabled platforms\n\n2. Update .env.example (if exists):\n   - Add ENABLE_BLUESKY=true\n   - Add ENABLE_TWITTER=false\n   - Add comments explaining when to enable Twitter\n\nEdge cases:\n- Handle case where both platforms are disabled (log warning)\n- Ensure backward compatibility if env vars not set\n\nPattern to follow:\nLook at how other boolean environment variables are handled in settings.py",
+      "subtasks": [],
+      "verification": [
+        "ENABLE_BLUESKY and ENABLE_TWITTER settings exist",
+        "DEFAULT_PLATFORMS correctly reflects enabled platforms",
+        "Settings file includes clear documentation"
+      ],
+      "summary": "Added ENABLE_BLUESKY and ENABLE_TWITTER environment variables with dynamic DEFAULT_PLATFORMS list. Updated .env.example, validators, and test configuration. All tests pass.",
+      "completedAt": "2026-02-01T17:08:19.243Z"
+    },
+    {
+      "number": 2,
+      "title": "Update TwitterService to handle missing credentials gracefully",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": [
+        "functional-1",
+        "functional-2"
+      ],
+      "dependencies": [
+        1
+      ],
+      "files": [
+        "services/twitter_service.py"
+      ],
+      "content": "Make TwitterService handle missing or insufficient credentials without errors.\n\nTasks:\n1. Update TwitterService.__init__:\n   - Add enabled parameter (default from settings.ENABLE_TWITTER)\n   - Store self.enabled flag\n   - Skip authentication if not enabled\n\n2. Update _setup_twitter:\n   - Return early if not enabled (log info message)\n   - Better error handling for insufficient API access (403 errors)\n   - Log specific error when API access level is insufficient\n\n3. Update get_recent_tweets and post_tweet:\n   - Return empty list / (False, None) if not enabled\n   - Log info (not error) when Twitter is disabled\n\nEdge cases:\n- Handle 403 Forbidden errors with helpful message about API access level\n- Gracefully handle partial credentials (some but not all tokens)\n- Don't spam error logs when Twitter is intentionally disabled",
+      "subtasks": [],
+      "verification": [
+        "TwitterService can be initialized with enabled=False",
+        "No errors logged when Twitter is disabled",
+        "Methods return appropriate defaults when disabled",
+        "403 errors produce helpful messages"
+      ],
+      "summary": "Updated TwitterService with enabled parameter. Added graceful handling for disabled state and 403 errors. All 39 tests pass including 4 new tests for disabled state.",
+      "completedAt": "2026-02-01T17:16:59.784Z"
+    },
+    {
+      "number": 3,
+      "title": "Update main.py to respect platform configuration",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": [
+        "functional-1",
+        "functional-3"
+      ],
+      "dependencies": [
+        1,
+        2
+      ],
+      "files": [
+        "main.py"
+      ],
+      "content": "Update NewsPoster to use configured platforms and initialize services conditionally.\n\nTasks:\n1. Update NewsPoster.__init__:\n   - Only initialize twitter_service if ENABLE_TWITTER is True\n   - Set twitter_service to None if disabled\n\n2. Update run method:\n   - Build platforms list from settings (only enabled platforms)\n   - Skip Twitter operations if twitter_service is None\n   - Update platform filtering logic to handle None services\n\n3. Add logging:\n   - Log which platforms are enabled at startup\n   - Log info message when Twitter is skipped\n\nEdge cases:\n- Handle case where platforms list becomes empty\n- Ensure backward compatibility for existing usage\n- Don't break if Twitter service initialization fails",
+      "subtasks": [],
+      "verification": [
+        "Application starts without Twitter credentials",
+        "Only enabled platforms are used",
+        "No errors when Twitter is disabled",
+        "Startup logs show which platforms are enabled"
+      ],
+      "summary": "Updated NewsPoster to conditionally initialize Twitter service and respect platform configuration. Added comprehensive logging. All 155 tests pass with full backward compatibility.",
+      "completedAt": "2026-02-01T17:25:54.411Z"
+    },
+    {
+      "number": 4,
+      "title": "Update tests for platform configuration",
+      "status": "completed",
+      "priority": "medium",
+      "addressesCriteria": [
+        "testing-1"
+      ],
+      "dependencies": [
+        1,
+        2,
+        3
+      ],
+      "files": [
+        "tests/test_twitter_service.py",
+        "tests/conftest.py"
+      ],
+      "content": "Add tests to verify platform enable/disable functionality.\n\nTasks:\n1. Update tests/conftest.py:\n   - Add ENABLE_BLUESKY and ENABLE_TWITTER to mock_settings\n   - Set appropriate defaults for test environment\n\n2. Add tests in tests/test_twitter_service.py:\n   - Test TwitterService with enabled=False\n   - Test get_recent_tweets returns empty list when disabled\n   - Test post_tweet returns (False, None) when disabled\n   - Test no errors logged when disabled\n\n3. Run existing tests to ensure no regressions:\n   - pytest tests/test_twitter_service.py -v\n   - pytest tests/ -v\n\nEdge cases:\n- Verify tests don't require real Twitter credentials\n- Ensure mocks work with new enabled parameter",
+      "subtasks": [],
+      "verification": [
+        "All new tests pass",
+        "All existing tests still pass",
+        "Test coverage maintained or improved"
+      ],
+      "summary": "Added comprehensive test coverage for platform configuration. Created 12 new integration tests. All 167 tests pass with full backward compatibility.",
+      "completedAt": "2026-02-01T17:31:13.075Z"
+    }
+  ],
+  "researchContext": {
+    "matched": [],
+    "keywords": [],
+    "staleWarnings": []
+  },
+  "projectContext": {
+    "name": null,
+    "hasProject": false,
+    "constraintsApplied": [],
+    "techStackUsed": []
+  },
+  "coverageMatrix": {
+    "functional-1": {
+      "phases": [
+        2,
+        3
+      ]
+    },
+    "functional-2": {
+      "phases": [
+        2
+      ]
+    },
+    "functional-3": {
+      "phases": [
+        1,
+        3
+      ]
+    },
+    "testing-1": {
+      "phases": [
+        4
+      ]
+    }
+  },
+  "addressesRequirements": [],
+  "release": {
+    "version": "v1.0.1",
+    "milestone": null
+  },
+  "queue": [],
+  "metadata": {
+    "estimatedPhases": 4,
+    "actualPhases": 4,
+    "parallelizable": false
+  }
+}

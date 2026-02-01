@@ -51,8 +51,19 @@ MAX_HISTORY_LINES = 100
 CLEANUP_THRESHOLD = 10
 MAX_ARTICLE_RETRIES = 30
 
+# Platform Enable/Disable Settings
+ENABLE_BLUESKY = os.getenv("ENABLE_BLUESKY", "true").lower() in ("true", "1", "yes")
+ENABLE_TWITTER = os.getenv("ENABLE_TWITTER", "false").lower() in ("true", "1", "yes")
+
 # Social Media Platform Settings
-DEFAULT_PLATFORMS = ["bluesky", "twitter"]  # Default platforms to post to
+# Dynamically build platform list based on enabled platforms
+_enabled_platforms = []
+if ENABLE_BLUESKY:
+    _enabled_platforms.append("bluesky")
+if ENABLE_TWITTER:
+    _enabled_platforms.append("twitter")
+
+DEFAULT_PLATFORMS = _enabled_platforms if _enabled_platforms else ["bluesky"]  # Fallback to bluesky if none enabled
 
 # AI Model Settings
 DEFAULT_AI_MODELS = [

@@ -56,14 +56,26 @@ class NewsPoster:
             article_service: Service for fetching articles. Defaults to new ArticleService.
             ai_service: Service for AI operations. Defaults to new AIService.
             social_service: Service for BlueSky posting. Defaults to new SocialService.
-            twitter_service: Service for Twitter posting. Defaults to new TwitterService.
+            twitter_service: Service for Twitter posting. Defaults to new TwitterService if enabled.
             validate: Whether to validate settings on init. Defaults to True.
         """
         # Initialize services (use provided or create defaults)
         self.article_service = article_service if article_service is not None else ArticleService()
         self.ai_service = ai_service if ai_service is not None else AIService()
         self.social_service = social_service if social_service is not None else SocialService()
-        self.twitter_service = twitter_service if twitter_service is not None else TwitterService()
+
+        # Only initialize Twitter service if enabled or explicitly provided
+        if twitter_service is not None:
+            # Use provided service
+            self.twitter_service = twitter_service
+        elif settings.ENABLE_TWITTER:
+            # Create Twitter service only if enabled
+            self.twitter_service = TwitterService()
+            logger.info("Twitter service initialized (enabled)")
+        else:
+            # Set to None if disabled
+            self.twitter_service = None
+            logger.info("Twitter service disabled")
 
         # Validate settings (can be skipped for testing)
         if validate:
@@ -72,20 +84,33 @@ class NewsPoster:
     def run(self, test_mode: bool = False, platforms: Optional[List[str]] = None) -> bool:
         """
         Run the main workflow of the News Poster application.
-        
+
         Args:
             test_mode: If True, runs in test mode without actually posting to social media
             platforms: List of social media platforms to post to, defaults to settings.DEFAULT_PLATFORMS
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
         # Set default platforms if none specified
         if platforms is None:
             platforms = settings.DEFAULT_PLATFORMS
-            
+
         # Normalize platform names
         platforms = [p.lower() for p in platforms]
+
+        # Remove Twitter from platforms if service is not available
+        if self.twitter_service is None and "twitter" in platforms:
+            logger.info("Twitter is in platforms list but Twitter service is disabled, removing from platforms")
+            platforms = [p for p in platforms if p != "twitter"]
+
+        # Check if we have any platforms to post to
+        if not platforms:
+            logger.error("No platforms available for posting. Check your platform configuration.")
+            return False
+
+        # Log enabled platforms at startup
+        logger.info(f"Enabled platforms for this run: {', '.join(platforms)}")
         
         try:
             # 1. Get news feed data from database
@@ -130,7 +155,7 @@ class NewsPoster:
                 logger.info(f"Retrieved {len(bsky_posts)} recent BlueSky posts")
             
             # Get recent Twitter posts if posting to Twitter
-            if "twitter" in platforms:
+            if "twitter" in platforms and self.twitter_service is not None:
                 twitter_posts = self.twitter_service.get_recent_tweets()
                 recent_posts.extend(twitter_posts)
                 logger.info(f"Retrieved {len(twitter_posts)} recent Twitter posts")
@@ -240,7 +265,7 @@ class NewsPoster:
                             logger.warning(f"Failed to post to BlueSky for: {article_content.title}")
                     
                     # Post to Twitter if enabled
-                    if "twitter" in platforms:
+                    if "twitter" in platforms and self.twitter_service is not None:
                         twitter_posted, twitter_social_post_id = self.twitter_service.post_tweet(
                             tweet_data['tweet_text'],
                             article_content.url,
@@ -263,7 +288,7 @@ class NewsPoster:
                                 article_content.top_image or "",
                                 platform="twitter"
                             )
-                            
+
                             success = True
                         else:
                             logger.warning(f"Failed to post to Twitter for: {article_content.title}")
@@ -373,9 +398,11 @@ def main():
     
     # Log application start
     logger.info("Starting News Poster application")
+    logger.info(f"Platform configuration - BlueSky: {settings.ENABLE_BLUESKY}, Twitter: {settings.ENABLE_TWITTER}")
+    logger.info(f"Default platforms: {', '.join(settings.DEFAULT_PLATFORMS)}")
     if platforms:
-        logger.info(f"Posting to platforms: {', '.join(platforms)}")
-    
+        logger.info(f"Command-line platforms override: {', '.join(platforms)}")
+
     try:
         # Initialize and run the News Poster
         poster = NewsPoster()

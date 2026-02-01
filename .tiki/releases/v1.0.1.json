@@ -8,19 +8,19 @@
     {
       "number": 17,
       "title": "google.generativeai issue",
-      "status": "planned",
+      "status": "shipped",
       "requirements": [],
       "currentPhase": null,
       "totalPhases": 2,
-      "completedAt": null
+      "completedAt": "2026-02-01T15:38:52.000Z"
     },
     {
       "number": 16,
       "title": "Twitter",
-      "status": "not_planned",
+      "status": "planned",
       "requirements": [],
       "currentPhase": null,
-      "totalPhases": null,
+      "totalPhases": 4,
       "completedAt": null
     }
   ],

@@ -806,5 +806,85 @@ class TestSocialPostDataFactory:
         assert post.created_at == custom_time
 
 
+# =============================================================================
+# Enabled/Disabled State Tests
+# =============================================================================
+
+class TestEnabledDisabledState:
+    """Tests for enabled/disabled state handling."""
+
+    def test_service_disabled_via_parameter(self):
+        """Service can be disabled via enabled parameter."""
+        import services.twitter_service as ts
+        importlib.reload(ts)
+        ts.settings = MagicMock()
+        ts.settings.ENABLE_TWITTER = True  # Setting says enabled
+        ts.tweepy = mock_tweepy_module
+
+        # But we override with enabled=False
+        service = ts.TwitterService(
+            enabled=False,
+            api_key="test",
+            api_key_secret="test",
+            access_token="test",
+            access_token_secret="test"
+        )
+
+        assert service.enabled is False
+        assert service.client is None
+
+    def test_service_enabled_from_settings(self):
+        """Service uses ENABLE_TWITTER from settings by default."""
+        import services.twitter_service as ts
+        importlib.reload(ts)
+
+        mock_settings = MagicMock()
+        mock_settings.ENABLE_TWITTER = False
+        mock_settings.TWITTER_API_KEY = "test"
+        mock_settings.TWITTER_API_KEY_SECRET = "test"
+        mock_settings.TWITTER_ACCESS_TOKEN = "test"
+        mock_settings.TWITTER_ACCESS_TOKEN_SECRET = "test"
+        mock_settings.TWITTER_BEARER_TOKEN = None
+
+        ts.settings = mock_settings
+        ts.tweepy = mock_tweepy_module
+
+        service = ts.TwitterService()
+
+        assert service.enabled is False
+        assert service.client is None
+
+    def test_get_recent_tweets_when_disabled(self):
+        """get_recent_tweets returns empty list when disabled."""
+        import services.twitter_service as ts
+        importlib.reload(ts)
+        ts.settings = MagicMock()
+        ts.settings.ENABLE_TWITTER = False
+        ts.tweepy = mock_tweepy_module
+
+        service = ts.TwitterService(enabled=False)
+        tweets = service.get_recent_tweets()
+
+        assert tweets == []
+
+    def test_post_tweet_when_disabled(self):
+        """post_tweet returns (False, None) when disabled."""
+        import services.twitter_service as ts
+        importlib.reload(ts)
+        ts.settings = MagicMock()
+        ts.settings.ENABLE_TWITTER = False
+        ts.tweepy = mock_tweepy_module
+
+        service = ts.TwitterService(enabled=False)
+        success, post_id = service.post_tweet(
+            tweet_text="Test",
+            article_url="https://example.com",
+            article_title="Test"
+        )
+
+        assert success is False
+        assert post_id is None
+
+
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

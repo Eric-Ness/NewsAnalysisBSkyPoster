@@ -82,6 +82,10 @@ def mock_settings():
         mock_settings_module.SELENIUM_PAGE_LOAD_TIMEOUT = 5
         mock_settings_module.XPATH_MIN_TEXT_LENGTH = 20
 
+        # Platform Enable/Disable Settings
+        mock_settings_module.ENABLE_BLUESKY = True
+        mock_settings_module.ENABLE_TWITTER = True
+
         # Social Media Platform Settings
         mock_settings_module.DEFAULT_PLATFORMS = ["bluesky", "twitter"]
         mock_settings_module.BLUESKY_FETCH_LIMIT = 80

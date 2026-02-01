@@ -40,6 +40,14 @@ def validate_settings():
     if not settings.DB_CONNECTION_STRING:
         errors.append("Database connection string could not be built. Check DB_SERVER, DB_NAME, DB_USER, DB_PASSWORD.")
 
+    # Check platform enable/disable configuration
+    import logging
+    logger = logging.getLogger(__name__)
+
+    if not settings.ENABLE_BLUESKY and not settings.ENABLE_TWITTER:
+        logger.warning("Both ENABLE_BLUESKY and ENABLE_TWITTER are disabled. "
+                      "Defaulting to BlueSky only. Check your .env configuration.")
+
     # Check for at least one social media platform authentication
     bluesky_configured = bool(settings.AT_PROTOCOL_USERNAME and settings.AT_PROTOCOL_PASSWORD)
 
@@ -57,6 +65,15 @@ def validate_settings():
     ])
 
     twitter_configured = twitter_oauth1 or twitter_app_only
+
+    # Validate enabled platforms have credentials
+    if settings.ENABLE_BLUESKY and not bluesky_configured:
+        errors.append("ENABLE_BLUESKY is true but BlueSky credentials are not configured. "
+                     "Please configure AT_PROTOCOL_USERNAME and AT_PROTOCOL_PASSWORD.")
+
+    if settings.ENABLE_TWITTER and not twitter_configured:
+        errors.append("ENABLE_TWITTER is true but Twitter credentials are not configured. "
+                     "Please configure Twitter API credentials.")
 
     if not bluesky_configured and not twitter_configured:
         errors.append("No social media platform authentication configured. "
@@ -114,8 +131,15 @@ def get_config_summary() -> dict:
 
     return {
         "platforms": {
-            "bluesky": bool(settings.AT_PROTOCOL_USERNAME and settings.AT_PROTOCOL_PASSWORD),
-            "twitter": bool(settings.TWITTER_API_KEY and settings.TWITTER_ACCESS_TOKEN),
+            "bluesky": {
+                "enabled": settings.ENABLE_BLUESKY,
+                "configured": bool(settings.AT_PROTOCOL_USERNAME and settings.AT_PROTOCOL_PASSWORD),
+            },
+            "twitter": {
+                "enabled": settings.ENABLE_TWITTER,
+                "configured": bool(settings.TWITTER_API_KEY and settings.TWITTER_ACCESS_TOKEN),
+            },
+            "default_platforms": settings.DEFAULT_PLATFORMS,
         },
         "database": {
             "server": settings.DB_SERVER[:20] + "..." if settings.DB_SERVER and len(settings.DB_SERVER) > 20 else settings.DB_SERVER,

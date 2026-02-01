@@ -37,7 +37,8 @@ class TwitterService:
         access_token_secret: Optional[str] = None,
         bearer_token: Optional[str] = None,
         post_storage: Optional[PostStorage] = None,
-        client: Optional[Any] = None
+        client: Optional[Any] = None,
+        enabled: Optional[bool] = None
     ):
         """Initialize the Twitter service with API authentication.
 
@@ -50,6 +51,7 @@ class TwitterService:
             post_storage: Storage backend for posts (implements PostStorage protocol).
                          Defaults to the global db instance. Pass None to skip storage.
             client: Pre-configured Tweepy client. If provided, skips authentication setup.
+            enabled: Whether Twitter integration is enabled. Defaults to settings.ENABLE_TWITTER.
         """
         self.api_key = api_key if api_key is not None else settings.TWITTER_API_KEY
         self.api_key_secret = api_key_secret if api_key_secret is not None else settings.TWITTER_API_KEY_SECRET
@@ -58,6 +60,8 @@ class TwitterService:
         self.bearer_token = bearer_token if bearer_token is not None else settings.TWITTER_BEARER_TOKEN
         # Use global db as default, but allow None to skip storage entirely
         self._post_storage = post_storage if post_storage is not None else db
+        # Store enabled flag from parameter or settings
+        self.enabled = enabled if enabled is not None else settings.ENABLE_TWITTER
 
         # Use pre-configured client or set up authentication
         if client is not None:
@@ -69,16 +73,21 @@ class TwitterService:
     def _setup_twitter(self) -> bool:
         """
         Set up Twitter API authentication using Tweepy.
-        
+
         Returns:
             bool: True if authentication was successful, False otherwise.
         """
+        # Return early if Twitter is not enabled
+        if not self.enabled:
+            logger.info("Twitter integration is disabled - skipping authentication")
+            return False
+
         try:
             # Check which authentication method to use
             if self.api_key and self.api_key_secret and self.access_token and self.access_token_secret:
                 # OAuth 1.0a for full read/write access
                 auth = tweepy.OAuth1UserHandler(
-                    self.api_key, 
+                    self.api_key,
                     self.api_key_secret,
                     self.access_token,
                     self.access_token_secret
@@ -88,7 +97,7 @@ class TwitterService:
                 self.client.verify_credentials()
                 logger.info("Successfully authenticated with Twitter API using OAuth 1.0a")
                 return True
-                
+
             elif self.bearer_token:
                 # OAuth 2.0 Bearer Token (app-only auth - limited to reading public data)
                 self.client = tweepy.Client(bearer_token=self.bearer_token)
@@ -96,16 +105,25 @@ class TwitterService:
                 self.client.get_user(username="twitter")
                 logger.info("Successfully authenticated with Twitter API using Bearer Token")
                 return True
-                
+
             else:
                 logger.error("No valid Twitter authentication method found. "
                              "Please provide either OAuth 1.0a credentials or a Bearer Token.")
                 return False
-                
+
         except AuthenticationError:
             raise
         except Exception as e:
-            logger.error(f"Failed to authenticate with Twitter: {e}")
+            # Check for 403 Forbidden errors which indicate insufficient API access level
+            error_str = str(e).lower()
+            if '403' in error_str or 'forbidden' in error_str:
+                logger.error(
+                    f"Failed to authenticate with Twitter (403 Forbidden): {e}. "
+                    "This usually indicates your API access level is insufficient. "
+                    "Please check your Twitter Developer account and ensure you have the correct access tier."
+                )
+            else:
+                logger.error(f"Failed to authenticate with Twitter: {e}")
             return False
 
     def get_recent_tweets(self, limit: int = settings.TWITTER_FETCH_LIMIT) -> List[FeedPost]:
@@ -118,6 +136,11 @@ class TwitterService:
         Returns:
             List[FeedPost]: A list of FeedPost objects representing the recent tweets.
         """
+        # Return empty list if Twitter is not enabled
+        if not self.enabled:
+            logger.info("Twitter integration is disabled - returning empty tweet list")
+            return []
+
         try:
             if not self.client:
                 logger.error("Twitter client not initialized")
@@ -231,6 +254,11 @@ class TwitterService:
         Returns:
             Tuple[bool, Optional[int]]: (success, social_post_id) - success status and the ID of the stored post record
         """
+        # Return False if Twitter is not enabled
+        if not self.enabled:
+            logger.info("Twitter integration is disabled - skipping tweet post")
+            return False, None
+
         try:
             if not self.client:
                 logger.error("Twitter client not initialized")
