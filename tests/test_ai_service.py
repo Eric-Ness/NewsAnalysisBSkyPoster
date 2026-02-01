@@ -230,20 +230,22 @@ class TestCandidateSelectionIntegration:
     def mock_ai_service(self):
         """Create an AIService with mocked Gemini model."""
         with patch('services.ai_service.genai') as mock_genai:
+            # Mock the Client and its models
+            mock_client = MagicMock()
+            mock_genai.Client.return_value = mock_client
+
             # Mock the model list
             mock_model = MagicMock()
             mock_model.name = 'models/gemini-2.0-flash'
-            mock_genai.list_models.return_value = [mock_model]
+            mock_client.models.list.return_value = [mock_model]
 
-            # Mock the GenerativeModel
-            mock_gen_model = MagicMock()
+            # Mock the generate_content response
             mock_response = MagicMock()
             mock_response.text = """1. URL: https://example.com/article-1
    TITLE: Breaking Article 1
 2. URL: https://example.com/article-2
    TITLE: Article 2"""
-            mock_gen_model.generate_content.return_value = mock_response
-            mock_genai.GenerativeModel.return_value = mock_gen_model
+            mock_client.models.generate_content.return_value = mock_response
 
             from services.ai_service import AIService
             service = AIService()

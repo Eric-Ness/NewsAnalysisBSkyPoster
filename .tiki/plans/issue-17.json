@@ -1,0 +1,124 @@
+{
+  "issue": {
+    "number": 17,
+    "title": "google.generativeai issue",
+    "url": "https://github.com/user/repo/issues/17"
+  },
+  "created": "2026-02-01T15:09:44.716Z",
+  "status": "completed",
+  "successCriteria": [
+    {
+      "category": "functional",
+      "description": "Application runs without FutureWarning from google.generativeai"
+    },
+    {
+      "category": "functional",
+      "description": "All AI service functionality works with google.genai package"
+    },
+    {
+      "category": "testing",
+      "description": "All existing tests pass with updated package"
+    },
+    {
+      "category": "testing",
+      "description": "Test fixtures updated to mock google.genai instead of google.generativeai"
+    }
+  ],
+  "assumptions": [],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Update dependencies and imports",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": [
+        "functional-1",
+        "functional-2"
+      ],
+      "dependencies": [],
+      "files": [
+        "requirements.txt",
+        "services/ai_service.py"
+      ],
+      "content": "Migrate from deprecated google.generativeai to google.genai package.\n\nTasks:\n1. Update requirements.txt:\n   - Replace 'google-generativeai>=0.3.0' with 'google-genai>=0.1.0'\n   \n2. Update services/ai_service.py:\n   - Change 'import google.generativeai as genai' to 'import google.genai as genai'\n   - Review API compatibility - the new package should maintain similar API surface\n   - Test that genai.configure(), genai.list_models(), and genai.GenerativeModel() still work\n\nEdge cases:\n- Verify the new package API is compatible with existing usage patterns\n- Check if any method signatures have changed\n\nNote: According to the deprecation notice, support for google.generativeai has ended.\nThe new google.genai package is the official replacement.",
+      "subtasks": [],
+      "verification": [
+        "No FutureWarning appears when importing ai_service.py",
+        "Application can initialize AIService without errors",
+        "AI model listing and selection works correctly"
+      ],
+      "summary": "Successfully migrated from google.generativeai to google.genai package. Updated requirements.txt, services/ai_service.py imports and API calls, and test fixtures. All verification checks passed.",
+      "completedAt": "2026-02-01T15:30:46.354Z"
+    },
+    {
+      "number": 2,
+      "title": "Update test fixtures and mocks",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": [
+        "testing-1",
+        "testing-2"
+      ],
+      "dependencies": [
+        1
+      ],
+      "files": [
+        "tests/conftest.py",
+        "tests/test_ai_service.py"
+      ],
+      "content": "Update test fixtures to mock the new google.genai package.\n\nTasks:\n1. Update tests/conftest.py:\n   - In mock_genai fixture (line 540), change patch target from 'google.generativeai' to 'google.genai'\n   - Verify mock model structure matches new API\n   \n2. Review tests/test_ai_service.py:\n   - Check if any tests directly import or patch google.generativeai\n   - Update any hardcoded references to the old package\n   \n3. Run all AI service tests to verify compatibility:\n   - pytest tests/test_ai_service.py -v\n   \nEdge cases:\n- Ensure mock object structure matches the new package's API\n- Verify all test assertions still make sense with the new package",
+      "subtasks": [],
+      "verification": [
+        "All tests in tests/test_ai_service.py pass",
+        "Mock fixtures correctly patch google.genai",
+        "No deprecation warnings in test output"
+      ],
+      "summary": "Updated test fixtures in conftest.py and test_ai_service.py to mock google.genai instead of google.generativeai. All 151 tests pass with no deprecation warnings.",
+      "completedAt": "2026-02-01T15:36:04.179Z"
+    }
+  ],
+  "researchContext": {
+    "matched": [],
+    "keywords": [],
+    "staleWarnings": []
+  },
+  "projectContext": {
+    "name": null,
+    "hasProject": false,
+    "constraintsApplied": [],
+    "techStackUsed": []
+  },
+  "coverageMatrix": {
+    "functional-1": {
+      "phases": [
+        1
+      ]
+    },
+    "functional-2": {
+      "phases": [
+        1
+      ]
+    },
+    "testing-1": {
+      "phases": [
+        2
+      ]
+    },
+    "testing-2": {
+      "phases": [
+        2
+      ]
+    }
+  },
+  "addressesRequirements": [],
+  "release": {
+    "version": "v1.0.1",
+    "milestone": null
+  },
+  "queue": [],
+  "metadata": {
+    "estimatedPhases": 2,
+    "actualPhases": 2,
+    "parallelizable": false
+  }
+}

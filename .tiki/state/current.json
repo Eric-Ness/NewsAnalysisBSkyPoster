@@ -2,6 +2,44 @@
   "activeIssue": null,
   "currentPhase": null,
   "status": "idle",
-  "lastCompletedIssue": 9,
-  "lastCompletedAt": "2026-01-27T15:30:00Z"
+  "lastCompletedIssue": 17,
+  "lastCompletedAt": "2026-02-01T15:36:04.184Z",
+  "activeExecutions": [
+    {
+      "id": "exec-release-v1-0-1-j5gy2zx2",
+      "type": "release",
+      "status": "executing",
+      "release": "v1.0.1",
+      "currentIssue": 17,
+      "issueOrder": [
+        17,
+        16
+      ],
+      "completedIssues": [],
+      "failedIssues": [],
+      "flags": {
+        "skipVerify": false,
+        "noTag": false
+      },
+      "startedAt": "2026-02-01T15:07:57.536Z",
+      "lastActivity": "2026-02-01T15:08:07.117Z"
+    }
+  ],
+  "executionHistory": [
+    {
+      "id": "exec-17-90b64315",
+      "issue": 17,
+      "issueTitle": "google.generativeai issue",
+      "status": "completed",
+      "startedAt": "2026-02-01T15:21:24.281Z",
+      "endedAt": "2026-02-01T15:36:04.184Z",
+      "completedPhases": 2,
+      "totalPhases": 2,
+      "summary": "Successfully migrated from google.generativeai to google.genai package. Updated dependencies, imports, API calls, and test fixtures. All tests pass."
+    }
+  ],
+  "version": 2,
+  "startedAt": "2026-02-01T15:21:24.281Z",
+  "lastActivity": "2026-02-01T15:36:04.184Z",
+  "completedPhases": []
 }

@@ -531,24 +531,26 @@ def mock_genai():
     """
     Mock the Google Generative AI library.
 
-    This fixture patches the google.generativeai module to prevent
+    This fixture patches the google.genai module to prevent
     actual API calls during testing.
 
     Returns:
         MagicMock: A mock genai module.
     """
-    with patch('google.generativeai') as mock_genai_module:
+    with patch('google.genai') as mock_genai_module:
+        # Mock the Client
+        mock_client = MagicMock()
+        mock_genai_module.Client.return_value = mock_client
+
         # Mock the model list
         mock_model = MagicMock()
         mock_model.name = 'models/gemini-2.0-flash'
-        mock_genai_module.list_models.return_value = [mock_model]
+        mock_client.models.list.return_value = [mock_model]
 
-        # Mock the GenerativeModel
-        mock_gen_model = MagicMock()
+        # Mock the generate_content response
         mock_response = MagicMock()
         mock_response.text = "Generated test content"
-        mock_gen_model.generate_content.return_value = mock_response
-        mock_genai_module.GenerativeModel.return_value = mock_gen_model
+        mock_client.models.generate_content.return_value = mock_response
 
         yield mock_genai_module
 

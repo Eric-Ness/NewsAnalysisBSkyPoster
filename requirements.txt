@@ -5,7 +5,7 @@ pandas>=2.0.0
 pyodbc>=4.0.39
 
 # AI dependencies
-google-generativeai>=0.3.0
+google-genai>=0.1.0
 
 # Website parsing & scraping
 newspaper3k>=0.2.8

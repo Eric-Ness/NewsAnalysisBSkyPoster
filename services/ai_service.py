@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import re
 
-import google.generativeai as genai
+import google.genai as genai
 from atproto import models
 
 from config import settings
@@ -59,11 +59,12 @@ class AIService:
         if not api_key:
             raise ValueError("Missing required GOOGLE_AI_API_KEY")
 
-        genai.configure(api_key=api_key)
+        # Create the genai client
+        self.client = genai.Client(api_key=api_key)
 
         # Get available models
         try:
-            models_list = genai.list_models()
+            models_list = self.client.models.list()
             available_models = [m.name for m in models_list]
 
             # Select a model based on preference order
@@ -85,8 +86,8 @@ class AIService:
 
             logger.info(f"Selected AI model: {model_name}")
 
-            # Initialize model with the complete model path
-            self.model = genai.GenerativeModel(model_name=model_name)
+            # Store the model name for use in generate_content calls
+            self.model_name = model_name
 
         except AIServiceError:
             raise
@@ -156,7 +157,10 @@ Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIF
 
             # Add timeout and error handling
             try:
-                response = self.model.generate_content(prompt)
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
                 result = response.text.strip().upper() == "SIMILAR"
                 logger.info(f"AI similarity check for '{article_title[:30]}...': {'SIMILAR' if result else 'DIFFERENT'}")
                 return result
@@ -285,7 +289,10 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
 
             try:
                 # Generate content using the model
-                response = self.model.generate_content(prompt)
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt
+                )
                 response_text = response.text
                 
                 # Parse and extract ranked articles
@@ -396,7 +403,10 @@ TWEET: [your tweet text]
 HASHTAG: [one relevant hashtag without the # symbol]
 SUMMARY: [one sentence summary of the article]"""
 
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt
+            )
             response_text = response.text
             
             # Extract the components from the response
