@@ -1,7 +1,7 @@
 {
   "version": "v1.0.1",
   "createdAt": "2026-02-01T15:05:32.959Z",
-  "status": "active",
+  "status": "completed",
   "requirementsEnabled": false,
   "githubMilestone": null,
   "issues": [
@@ -28,5 +28,6 @@
     "total": 0,
     "implemented": 0,
     "verified": 0
-  }
+  },
+  "completedAt": "2026-02-01T17:09:30.000Z"
 }
