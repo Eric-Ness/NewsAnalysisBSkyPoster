@@ -46,6 +46,19 @@ fi
 - **Not found:** List available releases, suggest `/tiki:release-new`
 - **Already shipped:** Show ship date and archive location
 
+### Step 2.5: Pre-Ship Hook (Conditional)
+
+**Only execute if:** `.tiki/hooks/pre-ship` (or `.sh`/`.ps1` on Windows) exists.
+
+Read `.tiki/prompts/hooks/execute-hook.md` for execution workflow. On Windows, also read `.tiki/prompts/hooks/windows-support.md`.
+
+Run `pre-ship` hook with:
+- `TIKI_ISSUE_NUMBER`: First issue number in release (for context)
+- `TIKI_RELEASE_VERSION`: Release version being shipped (e.g., "v1.0.14")
+- `TIKI_RELEASE_ISSUE_COUNT`: Total number of issues in release
+
+If hook fails (non-zero exit or timeout), abort release ship and show error message.
+
 ### Step 3: Pre-Ship Verification
 
 For each issue, verify GitHub state:
@@ -101,11 +114,17 @@ Core command: `gh api repos/:owner/:repo/milestones/{number} -X PATCH -f state="
 ### Step 8: Archive Release
 
 1. Get current user: `git config user.name || whoami`
-2. Build archived release with: status="shipped", shippedAt, shippedBy, gitTag, summary{}
-3. Create archive: `mkdir -p .tiki/releases/archive`
-4. Write to `.tiki/releases/archive/${VERSION}.json`
-5. Remove `.tiki/releases/${VERSION}.json`
-6. Update `.tiki/requirements.json` if modified
+2. Read current release JSON from `.tiki/releases/${VERSION}.json`
+3. Modify the release object:
+   - Set `status` to `"shipped"`
+   - Add `shippedAt` with current ISO timestamp
+   - Add `shippedBy` with current user
+   - Add `gitTag` (from Step 9 if created, otherwise null)
+   - Add `summary` object with issue counts and completion stats
+4. Create archive directory: `mkdir -p .tiki/releases/archive`
+5. Write modified release to `.tiki/releases/archive/${VERSION}.json`
+6. Remove `.tiki/releases/${VERSION}.json`
+7. Update `.tiki/requirements.json` if modified
 
 ### Step 9: Git Tag (Optional)
 
@@ -118,6 +137,18 @@ Prompt user:
 git tag -a "${VERSION}" -m "Release ${VERSION}"
 git push origin "${VERSION}"  # if pushing
 ```
+
+### Step 9.5: Post-Ship Hook (Conditional)
+
+**Only execute if:** `.tiki/hooks/post-ship` (or `.sh`/`.ps1` on Windows) exists.
+
+Read `.tiki/prompts/hooks/execute-hook.md` for execution workflow. On Windows, also read `.tiki/prompts/hooks/windows-support.md`.
+
+Run `post-ship` hook with:
+- `TIKI_RELEASE_VERSION`: Release version shipped
+- `TIKI_GIT_TAG`: Git tag created (if any)
+
+**Note:** Post-ship failure logs warning but doesn't fail release ship (work already done).
 
 ### Step 10: Ship Summary
 

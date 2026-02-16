@@ -5,7 +5,8 @@
     "url": "https://github.com/user/repo/issues/17"
   },
   "created": "2026-02-01T15:09:44.716Z",
-  "status": "completed",
+  "status": "shipped",
+  "shippedAt": "2026-02-01T15:38:52.000Z",
   "successCriteria": [
     {
       "category": "functional",

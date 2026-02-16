@@ -82,15 +82,35 @@ If blocking errors: Stop. If warnings: Show and continue.
 
 ### Step 5: Execute Phases
 
-Execute all phases (same as `/tiki:execute`):
+**CRITICAL: You MUST use the Skill tool to invoke `/tiki:execute`**
 
-**If TDD enabled:** Read `.tiki/prompts/yolo/tdd-handling.md` for TDD workflow.
+Do NOT:
+- Manually explore the codebase and make changes yourself
+- Spawn a Task sub-agent to do the implementation work directly
+- Skip the Skill tool invocation and attempt inline execution
 
-For each phase:
-1. Spawn sub-agent via Task tool
-2. Extract summary and discovered items
-3. Update state files
-4. Report progress
+WHY this matters: The `/tiki:execute` command contains essential state tracking logic that:
+- Creates execution objects in `activeExecutions`
+- Updates `currentPhase` as phases progress
+- Populates `completedPhases` array with summaries
+- Syncs deprecated v1 fields for Tiki.Desktop compatibility
+
+**If you skip the Skill tool invocation, the state file will remain empty and the user will see no progress.**
+
+Invoke execution using Skill tool:
+```text
+Skill tool invocation:
+- skill: "tiki:execute"
+- args: "{issueNumber}"
+```
+
+**If TDD enabled:** The execute command will read `.tiki/prompts/yolo/tdd-handling.md` for TDD workflow.
+
+The execute command handles:
+1. Spawning sub-agents via Task tool for each phase
+2. Extracting summaries and discovered items
+3. Updating state files with progress
+4. Reporting completion status
 
 If failed: Read `.tiki/prompts/yolo/error-recovery.md`, stop.
 

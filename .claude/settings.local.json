@@ -21,7 +21,9 @@
       "Bash(wc:*)",
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git clone:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(gh api:*)",
+      "Bash(C:/Users/Administrator/AppData/Local/Programs/Python/Python312/python.exe -m pip install -r requirements.txt)"
     ],
     "deny": [],
     "ask": []

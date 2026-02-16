@@ -50,6 +50,7 @@ PAYWALL_DOMAINS = [
     'prnewswire.com',       # PR Newswire
     'vaticannews.va'        # Vatican News
     'churchofjesuschrist.org',  # LDS Church News
+    'wizards.com',          # Wizards of the Coast News
     'globenewswire.com'     # GlobeNewswire (last item, no comma needed)
 ]
 

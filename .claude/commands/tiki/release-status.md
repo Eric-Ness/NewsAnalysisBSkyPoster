@@ -65,6 +65,15 @@ Create: /tiki:release-new <version>
 View archived: ls .tiki/releases/archive/
 ```
 
+### Step A1.5: Sort by Version
+
+Sort release files by semantic version (not alphabetically):
+- Parse version from filename (strip .json and leading v)
+- Compare by: major > minor > patch numerically
+- Example order: v1.1, v1.1.1, v1.6, v1.7, v1.12 (not v1.1, v1.1.1, v1.12, v1.6, v1.7)
+
+Note: `ls` produces alphabetical order which is incorrect for versions.
+
 ### Step A2: Load and Calculate Metrics
 
 For each release file, calculate:

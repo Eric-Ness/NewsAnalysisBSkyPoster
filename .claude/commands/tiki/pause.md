@@ -23,10 +23,36 @@ Save the current execution state so work can be resumed later. Captures context,
 
 Read `.tiki/state/current.json` to verify there's active work to pause.
 
-If no active work:
+**Detect state format version:**
+
+1. **v2 format** (has `version: 2` or `activeExecutions` array):
+   - Search `activeExecutions` array for entries with `status: "executing"`
+   - If multiple active executions found, ask user which to pause or offer to pause all
+   - If argument provided (issue number), find execution matching that issue
+   - Store the found execution(s) for later steps
+
+2. **v1 format** (no `version` field or `version: 1`):
+   - Check legacy `status` field for "executing" or "in_progress"
+   - Use `activeIssue` and `currentPhase` fields
+
+If no active work in either format:
 ```
 Nothing to pause. No active execution in progress.
 Use `/tiki:state` to see current status.
+```
+
+**Multiple active executions (v2 only):**
+```
+Multiple active executions found:
+- Issue #34: Add user authentication (Phase 2/4)
+- Issue #56: Fix payment processing (Phase 1/3)
+
+Which would you like to pause?
+1. Issue #34
+2. Issue #56
+3. All executions
+
+Enter choice or issue number:
 ```
 
 ### Step 2: Gather Current Context
@@ -89,6 +115,53 @@ Save detailed context to `.tiki/context/issue-N-phase-M.json`:
 
 ### Step 4: Update State Files
 
+**For v2 format (activeExecutions array):**
+
+1. Find the execution in `activeExecutions` by issue number
+2. Update that specific execution object:
+   - Set `status` to "paused"
+   - Set `pausedAt` to current timestamp
+   - Set `pauseReason` to the provided reason
+   - Update `lastActivity` to current timestamp
+
+3. Update deprecated v1 fields for Tiki.Desktop compatibility:
+   - Set root `status` to "paused" (aggregate state)
+   - Set root `pausedAt` to current timestamp
+   - Set root `pauseReason` to the reason
+   - Keep `activeIssue` and `currentPhase` synced with the paused execution
+
+**v2 format example:**
+```json
+{
+  "version": 2,
+  "status": "paused",
+  "activeIssue": 34,
+  "currentPhase": 2,
+  "pausedAt": "2026-01-10T14:30:00Z",
+  "pauseReason": "User requested pause",
+  "lastActivity": "2026-01-10T14:30:00Z",
+  "activeExecutions": [
+    {
+      "id": "exec-34-a1b2c3d4",
+      "issue": 34,
+      "issueTitle": "Add user authentication",
+      "currentPhase": 2,
+      "totalPhases": 4,
+      "status": "paused",
+      "startedAt": "2026-01-10T10:00:00Z",
+      "pausedAt": "2026-01-10T14:30:00Z",
+      "pauseReason": "User requested pause",
+      "lastActivity": "2026-01-10T14:30:00Z",
+      "completedPhases": [
+        { "number": 1, "title": "Setup auth middleware", "completedAt": "2026-01-10T12:00:00Z" }
+      ]
+    }
+  ]
+}
+```
+
+**For v1 format (legacy):**
+
 Update `.tiki/state/current.json`:
 
 ```json
@@ -103,6 +176,8 @@ Update `.tiki/state/current.json`:
   "completedPhases": [...]
 }
 ```
+
+**Update plan file (both formats):**
 
 Update the phase in `.tiki/plans/issue-N.json`:
 
@@ -220,3 +295,57 @@ Progress has been saved. Resume with:
 - Include enough detail that a fresh Claude session can continue
 - Capture decisions and rationale, not just what files changed
 - The context file is the primary source for `/resume`
+
+## Multi-Execution Support (v2 Format)
+
+The v2 state format supports multiple concurrent executions via the `activeExecutions` array. This section explains how pause handles this.
+
+### Format Detection
+
+```javascript
+// Detect v2 format
+const isV2 = state.version === 2 || Array.isArray(state.activeExecutions);
+
+if (isV2) {
+  // Find active executions
+  const activeExecs = state.activeExecutions.filter(e => e.status === "executing");
+  // Handle pause for specific execution(s)
+} else {
+  // Legacy v1 format - use root-level fields
+  const isActive = state.status === "executing" || state.status === "in_progress";
+}
+```
+
+### Updating Specific Execution
+
+When pausing in v2 format, update the specific execution object within the array:
+
+```javascript
+// Find and update the execution
+const execIndex = state.activeExecutions.findIndex(e => e.issue === issueNumber);
+if (execIndex !== -1) {
+  state.activeExecutions[execIndex].status = "paused";
+  state.activeExecutions[execIndex].pausedAt = new Date().toISOString();
+  state.activeExecutions[execIndex].pauseReason = reason;
+  state.activeExecutions[execIndex].lastActivity = new Date().toISOString();
+}
+```
+
+### Backward Compatibility
+
+Always update deprecated v1 fields when pausing to maintain Tiki.Desktop compatibility:
+
+| v2 Field (on execution) | v1 Field (root level) |
+|-------------------------|----------------------|
+| `execution.status` | `status` |
+| `execution.pausedAt` | `pausedAt` |
+| `execution.pauseReason` | `pauseReason` |
+| `execution.issue` | `activeIssue` |
+| `execution.currentPhase` | `currentPhase` |
+
+### Aggregate Status
+
+When multiple executions exist, the root `status` field reflects aggregate state:
+- If ANY execution is "paused", root status = "paused"
+- If ALL executions are "paused", root status = "paused"
+- The `activeIssue`/`currentPhase` fields sync with the most recently paused execution

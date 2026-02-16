@@ -273,6 +273,7 @@ MUST AVOID:
 - Sales events or deal roundups (unless truly newsworthy like major economic events)
 - Obituaries (unless major public figures with societal impact)
 - Articles too similar to the recent posts listed below
+- No horiscopes, astrology, or pseudoscience
 
 Recent posts:
 {recent_titles}

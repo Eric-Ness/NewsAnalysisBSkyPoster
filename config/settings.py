@@ -13,7 +13,8 @@ from dotenv import load_dotenv
 APP_ROOT = Path(__file__).resolve().parent.parent
 
 # Load environment variables from .env file
-load_dotenv(dotenv_path=os.path.join(APP_ROOT, '.env'))
+# Use override=True to ensure .env values take precedence over system environment variables
+load_dotenv(dotenv_path=os.path.join(APP_ROOT, '.env'), override=True)
 
 # API Keys and Authentication
 GOOGLE_AI_API_KEY = os.getenv("GOOGLE_AI_API_KEY")

@@ -44,6 +44,19 @@ Include issue reference and phase context if Tiki state exists.
 
 Use user-provided message as description if argument given.
 
+### Step 3.5: Pre-Commit Hook (Conditional)
+
+**Only execute if:** `.tiki/hooks/pre-commit` (or `.sh`/`.ps1` on Windows) exists.
+
+Read `.tiki/prompts/hooks/execute-hook.md` for execution workflow. On Windows, also read `.tiki/prompts/hooks/windows-support.md`.
+
+Run `pre-commit` hook with:
+- `TIKI_ISSUE_NUMBER`: Active issue number (if any)
+- `TIKI_PHASE_NUMBER`: Current phase number (if any)
+- `TIKI_COMMIT_MESSAGE`: Proposed commit message
+
+If hook fails (non-zero exit or timeout), abort commit and show error message.
+
 ### Step 4: Confirm and Execute
 
 Show proposed commit message and files to be committed.
@@ -64,6 +77,21 @@ Unless `--no-state` flag is passed:
 
 - Get commit hash from `git rev-parse HEAD`
 - Add commit to phase's `commits` array in plan file
+
+### Step 5.5: Post-Commit Hook (Conditional)
+
+**Only execute if:** `.tiki/hooks/post-commit` (or `.sh`/`.ps1` on Windows) exists.
+
+Read `.tiki/prompts/hooks/execute-hook.md` for execution workflow. On Windows, also read `.tiki/prompts/hooks/windows-support.md`.
+
+Run `post-commit` hook with:
+- `TIKI_ISSUE_NUMBER`: Active issue number (if any)
+- `TIKI_PHASE_NUMBER`: Current phase number (if any)
+- `TIKI_COMMIT_SHA`: Commit hash from `git rev-parse HEAD`
+
+**Note:** Post-commit failure logs warning but doesn't fail (commit already done).
+
+### Step 6: Display Result
 
 Display result and next steps.
 

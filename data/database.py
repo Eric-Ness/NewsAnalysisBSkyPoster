@@ -34,11 +34,12 @@ class DatabaseConnection:
     def connect(self) -> bool:
         """
         Establish a connection to the database.
-        
+
         Returns:
             bool: True if connection was successful, False otherwise.
         """
         try:
+            # Use simple connection string - .env file now loads with override=True
             self.conn = pyodbc.connect(settings.DB_CONNECTION_STRING)
             self.conn.setdecoding(pyodbc.SQL_CHAR, encoding='utf-8')
             logger.info("Successfully connected to database")
@@ -214,7 +215,7 @@ class DatabaseConnection:
         try:
             if not self.conn and not self.connect():
                 return None
-                
+
             return pd.read_sql(query, self.conn)
             
         except (QueryError, DatabaseError):

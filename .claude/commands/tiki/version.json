@@ -1,5 +1,322 @@
 {
-  "version": "1.9.0",
-  "installedDate": "2026-01-27",
-  "source": "https://github.com/Eric-Ness/Tiki"
+  "version": "1.12.5",
+  "releaseDate": "2026-02-01",
+  "installedDate": "2026-02-01",
+  "source": "https://github.com/Eric-Ness/Tiki",
+  "changelog": [
+    {
+      "version": "1.12.5",
+      "date": "2026-02-01",
+      "changes": [
+        "Issue #96: State file not updated during release-yolo execution"
+      ]
+    },
+    {
+      "version": "1.12.4",
+      "date": "2026-01-31",
+      "changes": [
+        "Issue #94: V2 state format missing legacy completedPhases array"
+      ]
+    },
+    {
+      "version": "1.12.3",
+      "date": "2026-01-31",
+      "changes": [
+        "Issue #93: Release Archive Not Sorting Properly"
+      ]
+    },
+    {
+      "version": "1.12.2",
+      "date": "2026-01-31",
+      "changes": [
+        "Issue #91: Bug: Release status not updated to shipped when archived"
+      ]
+    },
+    {
+      "version": "1.12.1",
+      "date": "2026-01-31",
+      "changes": [
+        "Issue #92: Lifecycle hooks not executing reliably on Windows during ship commands"
+      ]
+    },
+    {
+      "version": "1.12.0",
+      "date": "2026-01-30",
+      "changes": [
+        "Issue #90: Add multi-execution state support (v2 schema)",
+        "Support for concurrent issue executions with unique execution IDs",
+        "Execution ID format: exec-{issue}-{uuid} for tracking",
+        "Automatic v1 to v2 state migration",
+        "Stale execution detection and cleanup",
+        "Backward-compatible deprecated fields for Tiki.Desktop"
+      ]
+    },
+    {
+      "version": "1.11.0",
+      "date": "2026-01-30",
+      "changes": [
+        "Issue #87: Add project-specific custom commands and lifecycle hooks",
+        "New /tiki:hook-run command for manual hook testing",
+        "8 lifecycle hooks: pre-ship, post-ship, pre-execute, post-execute, pre-commit, post-commit, phase-start, phase-complete",
+        "Cross-platform support: Git Bash and PowerShell on Windows",
+        "Environment variables passed to hooks (TIKI_ISSUE_NUMBER, TIKI_PHASE_NUMBER, etc.)",
+        "Hook integration in ship.md, execute.md, and commit.md",
+        "New schemas: hook-result.schema.json, extensions in config.schema.json",
+        "Custom commands support via .tiki/commands/"
+      ]
+    },
+    {
+      "version": "1.10.0",
+      "date": "2026-01-27",
+      "changes": [
+        "New /tiki:release-review command for batch review of all issues in a release",
+        "Runs /tiki:review-issue for each issue automatically",
+        "Deep-dives on warnings/blockers with code analysis",
+        "Posts decisions as GitHub comments",
+        "Displays summary table with verdicts"
+      ]
+    },
+    {
+      "version": "1.9.0",
+      "date": "2026-01-21",
+      "changes": [
+        "Issue #86: Add institutional knowledge system with automatic capture",
+        "New /tiki:knowledge command (add/edit/show/list/search/archive)",
+        "KNOWLEDGE: marker extraction during phase execution",
+        "Auto-synthesis of knowledge entries on ship",
+        "Knowledge retrieval in plan-issue (Step 2.35) and review-issue (Step 4.7)",
+        "Config options: knowledge.autoCapture, captureOnShip, minPhasesForCapture",
+        "Schemas: knowledge.schema.json, knowledge-index.schema.json",
+        "6 new conditional prompts for knowledge workflows"
+      ]
+    },
+    {
+      "version": "1.8.0",
+      "date": "2026-01-20",
+      "changes": [
+        "Enhanced /tiki:new-project with full greenfield workflow",
+        "Deep questioning phase for conversational project discovery",
+        "4-agent parallel research for domain ecosystem analysis",
+        "Interactive requirements scoping by feature category",
+        "GitHub issue generation from requirements",
+        "New conditional prompts: deep-questioning.md, research-agents.md, feature-scoping.md, issue-generation.md",
+        "Added docs/Starting-a-New-Project.md wiki page"
+      ]
+    },
+    {
+      "version": "1.7.0",
+      "date": "2026-01-20",
+      "changes": [
+        "Release v1.7: Final command refactoring batch (9 commands, avg 56% reduction)",
+        "Issue #76: Refactor update-claude.md (79% reduction)",
+        "Issue #77: Refactor state.md (74% reduction)",
+        "Issue #78: Refactor adr.md (65% reduction)",
+        "Issue #79: Refactor pick-issue.md (49% reduction)",
+        "Issue #80: Refactor resume.md (54% reduction)",
+        "Issue #81: Refactor skip-phase.md (47% reduction)",
+        "Issue #82: Refactor commit.md (49% reduction)",
+        "Issue #83: Refactor add-todo.md (42% reduction)",
+        "Issue #84: Refactor update-tiki.md (43% reduction)"
+      ]
+    },
+    {
+      "version": "1.6.0",
+      "date": "2026-01-20",
+      "changes": [
+        "Release v1.6: Command refactoring batch (12 commands refactored)"
+      ]
+    },
+    {
+      "version": "1.3.7",
+      "date": "2026-01-20",
+      "changes": [
+        "Issue #49: Refactor release-yolo.md for context window efficiency (87% token reduction)"
+      ]
+    },
+    {
+      "version": "1.3.6",
+      "date": "2026-01-20",
+      "changes": [
+        "Issue #48: Refactor debug.md for context window efficiency (92% token reduction)"
+      ]
+    },
+    {
+      "version": "1.3.5",
+      "date": "2026-01-20",
+      "changes": [
+        "Issue #47: Refactor research.md for context window efficiency (90% token reduction)"
+      ]
+    },
+    {
+      "version": "1.3.4",
+      "date": "2026-01-20",
+      "changes": [
+        "Issue #46: Refactor define-requirements.md for context window efficiency (88% token reduction)"
+      ]
+    },
+    {
+      "version": "1.3.3",
+      "date": "2026-01-20",
+      "changes": [
+        "Issue #45: Refactor plan-issue.md for context window efficiency (76% token reduction)"
+      ]
+    },
+    {
+      "version": "1.3.2",
+      "date": "2026-01-19",
+      "changes": [
+        "Issue #44: Refactor execute.md for context window efficiency (92% token reduction)"
+      ]
+    },
+    {
+      "version": "1.3.1",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #38: Split release.md into 7 focused command files (release-new, release-status, release-add, release-remove, release-ship, release-yolo, release-sync)"
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #34: Add Diagnostic Agent documentation to execute.md",
+        "Issue #36: Add JSON schema validation for .tiki/ state files"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #24: Add parallel task execution within phases",
+        "Issue #23: Add /tiki:verify for structured user acceptance testing"
+      ]
+    },
+    {
+      "version": "1.1.1",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #27: Add phase assumptions listing to planning workflow"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #26: Expand /tiki:map-codebase to generate additional documentation",
+        "Issue #28: Add /tiki:changelog command to show recent updates"
+      ]
+    },
+    {
+      "version": "1.0.14",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #43: Add /tiki:roadmap for multi-release project visualization"
+      ]
+    },
+    {
+      "version": "1.0.13",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #42: Add release automation and command integration (/tiki:release yolo, sync, state/whats-next)"
+      ]
+    },
+    {
+      "version": "1.0.12",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #41: Add core release management system (/tiki:release)"
+      ]
+    },
+    {
+      "version": "1.0.11",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #40: Add requirements definition system (/tiki:define-requirements)"
+      ]
+    },
+    {
+      "version": "1.0.10",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #29: Add context window status display with proxy metrics"
+      ]
+    },
+    {
+      "version": "1.0.9",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #33: Add success criteria documentation to README"
+      ]
+    },
+    {
+      "version": "1.0.8",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #35: Fix auto-fix test expectations to match three-tier strategy"
+      ]
+    },
+    {
+      "version": "1.0.7",
+      "date": "2026-01-18",
+      "changes": [
+        "Issue #37: Move STACK.md and CONCERNS.md output to .tiki/ folder"
+      ]
+    },
+    {
+      "version": "1.0.6",
+      "date": "2026-01-16",
+      "changes": [
+        "Issue #25: Add /tiki:add-todo and /tiki:list-todos for backlog management"
+      ]
+    },
+    {
+      "version": "1.0.5",
+      "date": "2026-01-16",
+      "changes": [
+        "Issue #17: Add emoji-based progress notifications to auto-fix UX"
+      ]
+    },
+    {
+      "version": "1.0.4",
+      "date": "2026-01-16",
+      "changes": [
+        "Issue #16: Add filter flags and category batch operations to review-queue"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "date": "2026-01-16",
+      "changes": [
+        "Issue #15: Add trigger processing to review-queue for ADRs and CLAUDE.md updates"
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "date": "2026-01-16",
+      "changes": [
+        "Issue #14: Detect ADR and Update-Claude triggers during phase execution"
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "date": "2026-01-16",
+      "changes": [
+        "Issue #12: Add auto-fix infrastructure for verification failures"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2026-01-14",
+      "changes": [
+        "Initial release",
+        "Core workflow commands: get-issue, plan-issue, execute",
+        "Execution control: pause, resume, skip-phase, redo-phase, heal",
+        "Planning tools: audit-plan, discuss-phases",
+        "Code quality: assess-code, map-codebase",
+        "Documentation: adr, update-claude, commit",
+        "TDD support with test-creator",
+        "Self-update capability with update-tiki"
+      ]
+    }
+  ]
 }
