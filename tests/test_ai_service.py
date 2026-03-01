@@ -1,17 +1,21 @@
 """
-Tests for AI Service - Breaking News Prioritization
+Tests for AI Service - Breaking News Prioritization and Structured Output
 
 Tests the candidate selection logic that prioritizes articles with higher Source_Count
 while maintaining variety through randomization of regular articles.
+Also tests the structured output parsing for similarity checks, article selection,
+and tweet generation.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, PropertyMock
 import sys
 import os
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from services.ai_service import SelectedArticle, TweetResponse, SimilarityResult
 
 
 class TestBreakingNewsPrioritization:
@@ -224,11 +228,11 @@ class TestBreakingNewsPrioritization:
 
 
 class TestCandidateSelectionIntegration:
-    """Integration tests that verify the full candidate selection behavior."""
+    """Integration tests that verify the full candidate selection behavior with structured output."""
 
     @pytest.fixture
     def mock_ai_service(self):
-        """Create an AIService with mocked Gemini model."""
+        """Create an AIService with mocked Gemini model using structured output."""
         with patch('services.ai_service.genai') as mock_genai:
             # Mock the Client and its models
             mock_client = MagicMock()
@@ -239,23 +243,322 @@ class TestCandidateSelectionIntegration:
             mock_model.name = 'models/gemini-2.0-flash'
             mock_client.models.list.return_value = [mock_model]
 
-            # Mock the generate_content response
+            # Mock the generate_content response with structured output
             mock_response = MagicMock()
-            mock_response.text = """1. URL: https://example.com/article-1
-   TITLE: Breaking Article 1
-2. URL: https://example.com/article-2
-   TITLE: Article 2"""
+            mock_response.text = "DIFFERENT"
+            mock_response.parsed = [
+                SelectedArticle(url='https://example.com/article-1', title='Breaking Article 1'),
+                SelectedArticle(url='https://example.com/article-2', title='Article 2')
+            ]
             mock_client.models.generate_content.return_value = mock_response
 
             from services.ai_service import AIService
             service = AIService()
-            yield service
+            yield service, mock_client, mock_response
 
     def test_high_source_count_articles_included_in_candidates(self, mock_ai_service):
         """Verify that high Source_Count articles make it into the candidate pool."""
+        service, mock_client, mock_response = mock_ai_service
         # This is an integration test placeholder
         # Full integration would require more complex mocking
         pass
+
+    def test_select_articles_structured_output(self, mock_ai_service):
+        """Verify that structured output SelectedArticle list is correctly matched against candidates."""
+        service, mock_client, mock_response = mock_ai_service
+        from services.ai_service import FeedPost
+        from datetime import datetime
+
+        # Set up candidates that match the URLs in mock_response.parsed
+        candidates = [
+            {
+                'URL': 'https://example.com/article-1',
+                'Title': 'Breaking Article 1',
+                'News_Feed_ID': 1,
+                'Source_Count': 3
+            },
+            {
+                'URL': 'https://example.com/article-2',
+                'Title': 'Article 2',
+                'News_Feed_ID': 2,
+                'Source_Count': 1
+            },
+            {
+                'URL': 'https://example.com/article-3',
+                'Title': 'Article 3',
+                'News_Feed_ID': 3,
+                'Source_Count': 1
+            },
+        ]
+
+        recent_posts = [
+            FeedPost(text='Old post', url='https://example.com/old', title='Old Article', timestamp=datetime.now())
+        ]
+
+        result = service.select_news_articles(candidates, recent_posts, max_count=2)
+
+        # Should return exactly 2 articles matching the structured output
+        assert len(result) == 2
+        assert result[0]['URL'] == 'https://example.com/article-1'
+        assert result[0]['Title'] == 'Breaking Article 1'
+        assert result[0]['News_Feed_ID'] == 1
+        assert result[1]['URL'] == 'https://example.com/article-2'
+        assert result[1]['Title'] == 'Article 2'
+        assert result[1]['News_Feed_ID'] == 2
+
+    def test_select_articles_none_response(self, mock_ai_service):
+        """Verify fallback when response.parsed is None (should fall through to direct candidate selection)."""
+        service, mock_client, mock_response = mock_ai_service
+        from services.ai_service import FeedPost
+        from datetime import datetime
+
+        # Set parsed to None to simulate truncated/failed structured output
+        mock_response.parsed = None
+
+        candidates = [
+            {
+                'URL': 'https://example.com/article-1',
+                'Title': 'Breaking Article 1',
+                'News_Feed_ID': 1,
+                'Source_Count': 3
+            },
+            {
+                'URL': 'https://example.com/article-2',
+                'Title': 'Article 2',
+                'News_Feed_ID': 2,
+                'Source_Count': 1
+            },
+        ]
+
+        recent_posts = [
+            FeedPost(text='Old post', url='https://example.com/old', title='Old Article', timestamp=datetime.now())
+        ]
+
+        result = service.select_news_articles(candidates, recent_posts, max_count=2)
+
+        # Should fall back to direct candidate selection (top candidates from list)
+        assert len(result) == 2
+        # Fallback returns top candidates - articles should still be present
+        urls = [r['URL'] for r in result]
+        assert 'https://example.com/article-1' in urls
+        assert 'https://example.com/article-2' in urls
+
+
+class TestSimilarityCheck:
+    """Tests for the AI similarity check using structured enum output."""
+
+    @pytest.fixture
+    def mock_ai_service(self):
+        """Create an AIService with mocked Gemini model for similarity checks."""
+        with patch('services.ai_service.genai') as mock_genai:
+            mock_client = MagicMock()
+            mock_genai.Client.return_value = mock_client
+
+            mock_model = MagicMock()
+            mock_model.name = 'models/gemini-2.0-flash'
+            mock_client.models.list.return_value = [mock_model]
+
+            mock_response = MagicMock()
+            mock_client.models.generate_content.return_value = mock_response
+
+            from services.ai_service import AIService
+            service = AIService()
+            yield service, mock_client, mock_response
+
+    def test_similarity_check_similar(self, mock_ai_service):
+        """When AI returns 'SIMILAR', check_content_similarity should return True."""
+        service, mock_client, mock_response = mock_ai_service
+        from services.ai_service import FeedPost
+        from datetime import datetime
+
+        mock_response.text = 'SIMILAR'
+
+        recent_posts = [
+            FeedPost(
+                text='Economy grows as GDP rises',
+                url='https://example.com/economy',
+                title='GDP Growth Accelerates',
+                timestamp=datetime.now()
+            )
+        ]
+
+        # Use a title that is different enough to not trigger keyword pre-filter
+        # but similar enough for AI to flag
+        result = service.check_content_similarity(
+            article_title='Federal Reserve Adjusts Interest Rates',
+            article_text='The Federal Reserve announced changes to interest rates today.',
+            recent_posts=recent_posts
+        )
+
+        assert result is True
+
+    def test_similarity_check_different(self, mock_ai_service):
+        """When AI returns 'DIFFERENT', check_content_similarity should return False."""
+        service, mock_client, mock_response = mock_ai_service
+        from services.ai_service import FeedPost
+        from datetime import datetime
+
+        mock_response.text = 'DIFFERENT'
+
+        recent_posts = [
+            FeedPost(
+                text='Weather forecast for the week',
+                url='https://example.com/weather',
+                title='Weekly Weather Outlook',
+                timestamp=datetime.now()
+            )
+        ]
+
+        result = service.check_content_similarity(
+            article_title='New Technology Breakthrough in Quantum Computing',
+            article_text='Scientists have achieved a major breakthrough in quantum computing.',
+            recent_posts=recent_posts
+        )
+
+        assert result is False
+
+    def test_similarity_check_none_response(self, mock_ai_service):
+        """When response.text is None, check_content_similarity should return False (not crash)."""
+        service, mock_client, mock_response = mock_ai_service
+        from services.ai_service import FeedPost
+        from datetime import datetime
+
+        # Use PropertyMock to make .text return None
+        type(mock_response).text = PropertyMock(return_value=None)
+
+        recent_posts = [
+            FeedPost(
+                text='Some post about politics',
+                url='https://example.com/politics',
+                title='Political News Update',
+                timestamp=datetime.now()
+            )
+        ]
+
+        result = service.check_content_similarity(
+            article_title='Space Exploration Mission Launches Successfully',
+            article_text='NASA launched a new mission to explore the outer planets.',
+            recent_posts=recent_posts
+        )
+
+        # Should default to not similar when response is None
+        assert result is False
+
+
+class TestTweetGeneration:
+    """Tests for AI tweet generation using structured output."""
+
+    @pytest.fixture
+    def mock_ai_service(self):
+        """Create an AIService with mocked Gemini model for tweet generation."""
+        with patch('services.ai_service.genai') as mock_genai:
+            mock_client = MagicMock()
+            mock_genai.Client.return_value = mock_client
+
+            mock_model = MagicMock()
+            mock_model.name = 'models/gemini-2.0-flash'
+            mock_client.models.list.return_value = [mock_model]
+
+            mock_response = MagicMock()
+            mock_client.models.generate_content.return_value = mock_response
+
+            from services.ai_service import AIService
+            service = AIService()
+            yield service, mock_client, mock_response
+
+    def test_generate_tweet_structured(self, mock_ai_service):
+        """Verify that structured TweetResponse is correctly parsed into tweet dict."""
+        service, mock_client, mock_response = mock_ai_service
+
+        mock_response.parsed = TweetResponse(
+            tweet_text='Scientists discover high-energy particles from deep space, reshaping understanding of cosmic rays.',
+            hashtag='Science',
+            summary='Researchers have detected unprecedented high-energy cosmic ray particles.'
+        )
+
+        result = service.generate_tweet(
+            article_text='Scientists have discovered high-energy particles originating from deep space...',
+            article_title='Cosmic Ray Discovery Stuns Scientists',
+            article_url='https://example.com/cosmic-rays'
+        )
+
+        assert result is not None
+        # tweet_text should contain the original text plus hashtags
+        assert '#Science' in result['tweet_text']
+        assert '#News' in result['tweet_text']
+        assert 'Scientists discover high-energy particles' in result['tweet_text']
+        # Summary should be present
+        assert result['summary'] == 'Researchers have detected unprecedented high-energy cosmic ray particles.'
+        # Facets should exist for hashtag formatting
+        assert 'facets' in result
+        assert len(result['facets']) == 2  # One for generated hashtag, one for #News
+
+    def test_generate_tweet_hashtag_with_hash_prefix(self, mock_ai_service):
+        """Verify that hashtag with # prefix is handled correctly (# is stripped)."""
+        service, mock_client, mock_response = mock_ai_service
+
+        mock_response.parsed = TweetResponse(
+            tweet_text='New trade deal signed between major economies.',
+            hashtag='#Trade',
+            summary='A landmark trade agreement was finalized today.'
+        )
+
+        result = service.generate_tweet(
+            article_text='A major trade deal was signed today...',
+            article_title='Trade Deal Signed',
+            article_url='https://example.com/trade'
+        )
+
+        assert result is not None
+        # The # should be stripped, then re-added in the final text
+        assert '#Trade' in result['tweet_text']
+        # Should not have double ##
+        assert '##' not in result['tweet_text']
+
+    def test_generate_tweet_none_response(self, mock_ai_service):
+        """Verify that None parsed response returns None (not crash)."""
+        service, mock_client, mock_response = mock_ai_service
+
+        mock_response.parsed = None
+
+        result = service.generate_tweet(
+            article_text='Some article text here.',
+            article_title='Some Article',
+            article_url='https://example.com/article'
+        )
+
+        assert result is None
+
+
+class TestPydanticModels:
+    """Tests for the Pydantic model definitions used in structured output."""
+
+    def test_selected_article_creation(self):
+        """Verify SelectedArticle can be created with expected fields."""
+        article = SelectedArticle(url='https://example.com/test', title='Test Article')
+        assert article.url == 'https://example.com/test'
+        assert article.title == 'Test Article'
+
+    def test_tweet_response_creation(self):
+        """Verify TweetResponse can be created with expected fields."""
+        tweet = TweetResponse(
+            tweet_text='Test tweet text',
+            hashtag='TestTag',
+            summary='Test summary'
+        )
+        assert tweet.tweet_text == 'Test tweet text'
+        assert tweet.hashtag == 'TestTag'
+        assert tweet.summary == 'Test summary'
+
+    def test_similarity_result_enum_values(self):
+        """Verify SimilarityResult enum has expected values."""
+        assert SimilarityResult.SIMILAR.value == "SIMILAR"
+        assert SimilarityResult.DIFFERENT.value == "DIFFERENT"
+
+    def test_similarity_result_enum_from_string(self):
+        """Verify SimilarityResult can be created from string value."""
+        assert SimilarityResult("SIMILAR") == SimilarityResult.SIMILAR
+        assert SimilarityResult("DIFFERENT") == SimilarityResult.DIFFERENT
 
 
 if __name__ == '__main__':

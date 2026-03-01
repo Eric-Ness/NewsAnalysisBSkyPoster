@@ -48,10 +48,17 @@ PAYWALL_DOMAINS = [
     'freebeacon.com',       # The Washington Free Beacon
     'engadget.com',         # Engadget
     'prnewswire.com',       # PR Newswire
-    'vaticannews.va'        # Vatican News
+    'vaticannews.va',       # Vatican News
     'churchofjesuschrist.org',  # LDS Church News
     'wizards.com',          # Wizards of the Coast News
-    'globenewswire.com'     # GlobeNewswire (last item, no comma needed)
+    'globenewswire.com',    # GlobeNewswire
+
+    # Scrape-blocked domains (403/401 errors, not true paywalls)
+    # Note: These may need removal if scraping capabilities improve in the future.
+    'politico.com',         # Politico
+    'reuters.com',          # Reuters
+    'axios.com',            # Axios
+    'thehill.com',          # The Hill
 ]
 
 # =============================================================================

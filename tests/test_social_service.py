@@ -415,9 +415,10 @@ class TestPosting:
 
             mock_db.insert_social_post.return_value = 43
 
-            # Mock image download
+            # Mock image download with valid Content-Type
             mock_response = MagicMock()
             mock_response.content = b"fake image data"
+            mock_response.headers = {'Content-Type': 'image/jpeg'}
             mock_requests.get.return_value = mock_response
 
             MockClient.return_value = mock_client
@@ -663,9 +664,10 @@ class TestImageUpload:
 
             mock_db.insert_social_post.return_value = 47
 
-            # Mock successful image download
+            # Mock successful image download with valid Content-Type
             mock_response = MagicMock()
             mock_response.content = b"\x89PNG\r\n\x1a\n"  # PNG header bytes
+            mock_response.headers = {'Content-Type': 'image/png'}
             mock_requests.get.return_value = mock_response
 
             MockClient.return_value = mock_client
@@ -700,9 +702,10 @@ class TestImageUpload:
 
             mock_db.insert_social_post.return_value = 48
 
-            # Mock successful image download
+            # Mock successful image download with valid Content-Type
             mock_response = MagicMock()
             mock_response.content = b"fake image data"
+            mock_response.headers = {'Content-Type': 'image/jpeg'}
             mock_requests.get.return_value = mock_response
 
             MockClient.return_value = mock_client
@@ -800,9 +803,10 @@ class TestImageUpload:
             mock_client = MagicMock()
             mock_client.login.return_value = MagicMock()
 
-            # Mock successful image download but MediaUploadError on upload
+            # Mock successful image download with valid Content-Type but MediaUploadError on upload
             mock_response = MagicMock()
             mock_response.content = b"fake image data"
+            mock_response.headers = {'Content-Type': 'image/jpeg'}
             mock_requests.get.return_value = mock_response
 
             mock_client.com.atproto.repo.upload_blob.side_effect = MediaUploadError("Blob too large")
@@ -819,6 +823,127 @@ class TestImageUpload:
                     article_title="Test Article",
                     article_image="https://example.com/image.jpg"
                 )
+
+    def test_upload_image_invalid_content_type(self, mock_settings_for_social, mock_post_response):
+        """Skips image upload when Content-Type is not an image type (e.g., text/html)."""
+        with patch('services.social_service.Client') as MockClient, \
+             patch('services.social_service.db') as mock_db, \
+             patch('services.social_service.requests') as mock_requests, \
+             patch('services.social_service.models') as mock_models:
+
+            mock_client = MagicMock()
+            mock_client.login.return_value = MagicMock()
+            mock_client.send_post.return_value = mock_post_response
+
+            mock_profile = MagicMock()
+            mock_profile.did = "did:plc:testuser123"
+            mock_profile.display_name = "Test User"
+            mock_client.get_profile.return_value = mock_profile
+
+            mock_db.insert_social_post.return_value = 51
+
+            # Mock image download returning HTML (e.g., paywall/login page)
+            mock_response = MagicMock()
+            mock_response.content = b"<html><body>Access Denied</body></html>"
+            mock_response.headers = {'Content-Type': 'text/html; charset=utf-8'}
+            mock_requests.get.return_value = mock_response
+
+            MockClient.return_value = mock_client
+
+            from services.social_service import SocialService
+            service = SocialService()
+            success, post_id = service.post_to_social(
+                tweet_text="Test post with bad image",
+                article_url="https://example.com/article",
+                article_title="Test Article",
+                article_image="https://example.com/image.jpg"
+            )
+
+            # Post should succeed without image
+            assert success is True
+            # upload_blob should NOT be called for non-image Content-Type
+            mock_client.com.atproto.repo.upload_blob.assert_not_called()
+
+    def test_upload_image_missing_content_type(self, mock_settings_for_social, mock_post_response):
+        """Skips image upload when Content-Type header is missing."""
+        with patch('services.social_service.Client') as MockClient, \
+             patch('services.social_service.db') as mock_db, \
+             patch('services.social_service.requests') as mock_requests, \
+             patch('services.social_service.models') as mock_models:
+
+            mock_client = MagicMock()
+            mock_client.login.return_value = MagicMock()
+            mock_client.send_post.return_value = mock_post_response
+
+            mock_profile = MagicMock()
+            mock_profile.did = "did:plc:testuser123"
+            mock_profile.display_name = "Test User"
+            mock_client.get_profile.return_value = mock_profile
+
+            mock_db.insert_social_post.return_value = 52
+
+            # Mock image download with no Content-Type header
+            mock_response = MagicMock()
+            mock_response.content = b"some binary data"
+            mock_response.headers = {}  # No Content-Type header
+            mock_requests.get.return_value = mock_response
+
+            MockClient.return_value = mock_client
+
+            from services.social_service import SocialService
+            service = SocialService()
+            success, post_id = service.post_to_social(
+                tweet_text="Test post with missing content type",
+                article_url="https://example.com/article",
+                article_title="Test Article",
+                article_image="https://example.com/image.jpg"
+            )
+
+            # Post should succeed without image
+            assert success is True
+            # upload_blob should NOT be called when Content-Type is missing
+            mock_client.com.atproto.repo.upload_blob.assert_not_called()
+
+    def test_upload_image_valid_content_type(self, mock_settings_for_social, mock_post_response, mock_upload_response):
+        """Proceeds with image upload when Content-Type is a valid image type."""
+        with patch('services.social_service.Client') as MockClient, \
+             patch('services.social_service.db') as mock_db, \
+             patch('services.social_service.requests') as mock_requests, \
+             patch('services.social_service.models') as mock_models:
+
+            mock_client = MagicMock()
+            mock_client.login.return_value = MagicMock()
+            mock_client.send_post.return_value = mock_post_response
+            mock_client.com.atproto.repo.upload_blob.return_value = mock_upload_response
+
+            mock_profile = MagicMock()
+            mock_profile.did = "did:plc:testuser123"
+            mock_profile.display_name = "Test User"
+            mock_client.get_profile.return_value = mock_profile
+
+            mock_db.insert_social_post.return_value = 53
+
+            # Mock image download with valid Content-Type (including parameters)
+            mock_response = MagicMock()
+            mock_response.content = b"\xff\xd8\xff\xe0"  # JPEG header bytes
+            mock_response.headers = {'Content-Type': 'image/jpeg; charset=utf-8'}
+            mock_requests.get.return_value = mock_response
+
+            MockClient.return_value = mock_client
+
+            from services.social_service import SocialService
+            service = SocialService()
+            success, post_id = service.post_to_social(
+                tweet_text="Test post with valid image",
+                article_url="https://example.com/article",
+                article_title="Test Article",
+                article_image="https://example.com/image.jpg"
+            )
+
+            # Post should succeed with image
+            assert success is True
+            # upload_blob SHOULD be called for valid image Content-Type
+            mock_client.com.atproto.repo.upload_blob.assert_called_once_with(b"\xff\xd8\xff\xe0")
 
 
 # =============================================================================
@@ -872,6 +997,7 @@ class TestErrorHandling:
 
             mock_response = MagicMock()
             mock_response.content = b"fake image"
+            mock_response.headers = {'Content-Type': 'image/gif'}
             mock_requests.get.return_value = mock_response
 
             mock_client.com.atproto.repo.upload_blob.side_effect = MediaUploadError("Invalid format")

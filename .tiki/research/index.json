@@ -1,0 +1,21 @@
+{
+  "topics": {
+    "gemini-structured-output": {
+      "path": ".tiki/research/gemini-structured-output/research.md",
+      "researched_at": "2026-03-01T18:25:00Z",
+      "expires_at": "2026-03-08T18:25:00Z",
+      "mode": "full",
+      "status": "complete",
+      "confidence": "high",
+      "sources_count": 18,
+      "aliases": [
+        "gemini-structured-output",
+        "gemini-json-mode",
+        "response_schema",
+        "structured-output",
+        "pydantic-genai",
+        "gemini-pydantic"
+      ]
+    }
+  }
+}

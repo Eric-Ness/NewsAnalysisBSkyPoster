@@ -1,0 +1,253 @@
+{
+  "issue": {
+    "number": 18,
+    "title": "Fix: Bluesky posts failing ~9.3% of runs due to aggressive filtering and unfetchable sources",
+    "url": "https://github.com/ericness/NewsAnalysisBSkyPoster/issues/18"
+  },
+  "created": "2026-03-01T19:00:00Z",
+  "status": "completed",
+  "successCriteria": [
+    {
+      "id": "functional-1",
+      "category": "functional",
+      "description": "Domains politico.com, reuters.com, axios.com, thehill.com are filtered out before AI article selection via PAYWALL_DOMAINS"
+    },
+    {
+      "id": "functional-2",
+      "category": "functional",
+      "description": "Title keyword similarity threshold raised from 0.5 to 0.7, reducing false-positive duplicate blocks"
+    },
+    {
+      "id": "functional-3",
+      "category": "functional",
+      "description": "MIN_KEYWORD_LENGTH raised from 3 to 4, excluding common short words (says, told, over, more) from similarity comparison"
+    },
+    {
+      "id": "functional-4",
+      "category": "functional",
+      "description": "SIMILARITY_CHECK_POSTS_LIMIT reduced from 72 to 30, narrowing the comparison window"
+    },
+    {
+      "id": "functional-5",
+      "category": "functional",
+      "description": "Image uploads validate Content-Type header before calling upload_blob; invalid MIME types skip image instead of failing the entire post"
+    },
+    {
+      "id": "functional-6",
+      "category": "functional",
+      "description": "AI similarity check uses Gemini text/x.enum structured output with SimilarityResult enum, eliminating string parsing"
+    },
+    {
+      "id": "functional-7",
+      "category": "functional",
+      "description": "AI article selection uses Gemini JSON structured output with list[SelectedArticle] Pydantic model, eliminating fragile regex parsing"
+    },
+    {
+      "id": "functional-8",
+      "category": "functional",
+      "description": "AI tweet generation uses Gemini JSON structured output with TweetResponse Pydantic model, eliminating line-based string parsing"
+    },
+    {
+      "id": "non-functional-1",
+      "category": "non-functional",
+      "description": "Missing comma bug in domain_lists.py line 51-52 (vaticannews.va + churchofjesuschrist.org concatenation) is fixed"
+    },
+    {
+      "id": "non-functional-2",
+      "category": "non-functional",
+      "description": "Scrape-blocked domains are distinguished from true paywalls with a clear comment section in domain_lists.py"
+    },
+    {
+      "id": "testing-1",
+      "category": "testing",
+      "description": "All existing tests pass after changes"
+    },
+    {
+      "id": "testing-2",
+      "category": "testing",
+      "description": "New tests verify MIME type validation: valid image passes, invalid Content-Type skips upload, missing Content-Type skips upload"
+    },
+    {
+      "id": "testing-3",
+      "category": "testing",
+      "description": "AI service tests updated to mock response.parsed (Pydantic instances) instead of response.text for structured output methods"
+    }
+  ],
+  "assumptions": [
+    {
+      "id": "A1",
+      "confidence": "high",
+      "description": "google-genai SDK v1.61.0 (currently installed) supports response_mime_type, response_schema, and response.parsed for structured output",
+      "source": "Research: gemini-structured-output (18 sources, high confidence)",
+      "affectsPhases": [3, 4]
+    },
+    {
+      "id": "A2",
+      "confidence": "high",
+      "description": "Pydantic is already a transitive dependency of google-genai, so no new dependencies are needed",
+      "source": "Research: gemini-structured-output",
+      "affectsPhases": [3]
+    },
+    {
+      "id": "A3",
+      "confidence": "high",
+      "description": "Field(default=...) is NOT supported in response_schema Pydantic models - SDK raises ValueError",
+      "source": "Research: gemini-structured-output (Issue #460)",
+      "affectsPhases": [3]
+    },
+    {
+      "id": "A4",
+      "confidence": "high",
+      "description": "response.parsed returns None when max_output_tokens exceeded or safety filters trigger - must guard with None check",
+      "source": "Research: gemini-structured-output (Issue #1039)",
+      "affectsPhases": [3, 4]
+    },
+    {
+      "id": "A5",
+      "confidence": "high",
+      "description": "MIN_KEYWORD_LENGTH uses strict > operator (len(w) > setting), so value 4 means words with 5+ characters are kept",
+      "source": "Code analysis: ai_service.py line 118",
+      "affectsPhases": [1]
+    },
+    {
+      "id": "A6",
+      "confidence": "high",
+      "description": "timesofisrael.com is already in BLOCKED_DOMAINS (line 92), so it does not need to be added to PAYWALL_DOMAINS",
+      "source": "Code analysis: domain_lists.py",
+      "affectsPhases": [1]
+    },
+    {
+      "id": "A7",
+      "confidence": "medium",
+      "description": "The scrape-blocked domains (politico.com, reuters.com, etc.) may become fetchable if scraping improves, requiring later removal",
+      "source": "Issue #18 Risk section, Pre-Planning Review warning",
+      "affectsPhases": [1]
+    }
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "title": "Configuration tuning and domain list fixes",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": ["functional-1", "functional-2", "functional-3", "functional-4", "non-functional-1", "non-functional-2"],
+      "researchReferences": [],
+      "dependencies": [],
+      "files": ["config/settings.py", "config/domain_lists.py"],
+      "content": "Apply all configuration-only fixes from Issue #18 (Issues 1, 2, 3). These are value changes with no logic modifications.\n\nTasks:\n1. In config/settings.py:\n   - Line 96: Change SIMILARITY_CHECK_POSTS_LIMIT from 72 to 30\n   - Line 97: Change MIN_KEYWORD_LENGTH from 3 to 4\n   - Line 98: Change TITLE_SIMILARITY_THRESHOLD from 0.5 to 0.7\n\n2. In config/domain_lists.py:\n   - Fix missing comma bug on line 51: 'vaticannews.va' is missing a trailing comma, causing string concatenation with 'churchofjesuschrist.org' on line 52\n   - Add a new comment section '# Scrape-blocked domains (403/401 errors, not true paywalls)' before the new entries\n   - Add politico.com, reuters.com, axios.com, thehill.com to PAYWALL_DOMAINS under this new section\n   - Do NOT add timesofisrael.com (already in BLOCKED_DOMAINS)\n\nNote (A5): MIN_KEYWORD_LENGTH uses strict > operator, so value 4 means words 5+ chars are kept. This is consistent with the issue's intent.\nNote (A7): Add a comment noting these scrape-blocked domains may need removal if scraping improves.",
+      "subtasks": [],
+      "verification": [
+        "config/settings.py has SIMILARITY_CHECK_POSTS_LIMIT = 30",
+        "config/settings.py has MIN_KEYWORD_LENGTH = 4",
+        "config/settings.py has TITLE_SIMILARITY_THRESHOLD = 0.7",
+        "config/domain_lists.py has 'vaticannews.va' with proper trailing comma on line 51",
+        "config/domain_lists.py has politico.com, reuters.com, axios.com, thehill.com in PAYWALL_DOMAINS",
+        "config/domain_lists.py has comment distinguishing scrape-blocked from true paywalls",
+        "All existing tests pass: pytest tests/"
+      ],
+      "summary": null,
+      "completedAt": null
+    },
+    {
+      "number": 2,
+      "title": "Image MIME type validation before upload",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": ["functional-5", "testing-2"],
+      "researchReferences": [],
+      "dependencies": [],
+      "files": ["services/social_service.py", "tests/test_social_service.py"],
+      "content": "Add Content-Type validation in social_service.py to prevent InvalidMimeType errors from cascading into full post failures.\n\nTasks:\n1. In services/social_service.py lines 177-187, modify the image upload block:\n   - After requests.get(), check response.headers.get('Content-Type', '')\n   - If Content-Type does not start with 'image/', log a warning and skip the upload (leave thumb as None)\n   - If Content-Type is valid, proceed with upload_blob as before\n   - This allows the post to proceed without an image rather than failing entirely\n\n2. In tests/test_social_service.py, add tests in TestImageUpload class:\n   - test_upload_image_invalid_content_type: Mock response with Content-Type 'text/html', verify upload_blob is NOT called, post still succeeds\n   - test_upload_image_missing_content_type: Mock response with empty/missing Content-Type header, verify upload is skipped\n   - test_upload_image_valid_content_type: Mock response with Content-Type 'image/jpeg', verify upload_blob IS called\n\nFollow the existing test pattern: patch services.social_service.Client, .requests, .db, .models.\n\nEdge cases:\n- Content-Type might include parameters: 'image/jpeg; charset=utf-8' - startswith('image/') handles this\n- Content-Type might be missing entirely - default to empty string, skip upload",
+      "subtasks": [],
+      "verification": [
+        "social_service.py checks Content-Type before calling upload_blob",
+        "Invalid Content-Type logs warning and skips upload (thumb stays None)",
+        "Post proceeds without image when Content-Type is invalid",
+        "3 new tests exist and pass for MIME type validation",
+        "All existing tests still pass: pytest tests/test_social_service.py"
+      ],
+      "summary": null,
+      "completedAt": null
+    },
+    {
+      "number": 3,
+      "title": "Structured output models and similarity check migration",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": ["functional-6", "functional-7", "functional-8"],
+      "researchReferences": ["gemini-structured-output"],
+      "dependencies": [],
+      "files": ["services/ai_service.py"],
+      "content": "Define Pydantic models and migrate all 3 AI methods to use Gemini structured output, eliminating fragile regex/string parsing.\n\nTasks:\n1. Add imports at top of ai_service.py:\n   - from enum import Enum\n   - from pydantic import BaseModel, Field\n   - from google.genai import types\n\n2. Define Pydantic models (after FeedPost dataclass, before AIService class):\n   ```python\n   class SimilarityResult(Enum):\n       SIMILAR = \"SIMILAR\"\n       DIFFERENT = \"DIFFERENT\"\n\n   class SelectedArticle(BaseModel):\n       url: str = Field(description=\"The exact URL from the candidates list\")\n       title: str = Field(description=\"The exact title from the candidates list\")\n\n   class TweetResponse(BaseModel):\n       tweet_text: str = Field(description=\"Factual social media post under 260 chars\")\n       hashtag: str = Field(description=\"One relevant hashtag without # symbol\")\n       summary: str = Field(description=\"One sentence summary of the article\")\n   ```\n   IMPORTANT (A3): Do NOT use Field(default=...) - SDK rejects default values.\n\n3. Migrate check_content_similarity (lines 158-171):\n   - Create config: types.GenerateContentConfig(response_mime_type='text/x.enum', response_schema=SimilarityResult)\n   - Pass config to generate_content\n   - Replace response.text.strip().upper() == 'SIMILAR' with response.text.strip() == 'SIMILAR'\n   - CRITICAL (A4): Guard with 'if response.text is None: return False' before accessing .text\n   - Remove format instruction from prompt ('Return ONLY SIMILAR...' line) - the enum schema handles this\n\n4. Migrate select_news_articles (lines 291-324):\n   - Create config: types.GenerateContentConfig(response_mime_type='application/json', response_schema=list[SelectedArticle])\n   - Pass config to generate_content\n   - CRITICAL (A4): Guard with 'if response.parsed is None' before accessing .parsed\n   - Replace regex parsing block (lines 300-324) with:\n     parsed_articles = response.parsed\n     for article in parsed_articles:\n       selected_item = next((item for item in candidate_list if item['URL'] == article.url), None)\n       if selected_item:\n         selected_articles.append({...})\n   - Remove format instructions from prompt ('Return ONLY the URLs and Titles in this format...' section)\n   - Keep all selection criteria and MUST AVOID instructions in prompt\n\n5. Migrate generate_tweet (lines 407-416):\n   - Create config: types.GenerateContentConfig(response_mime_type='application/json', response_schema=TweetResponse)\n   - Pass config to generate_content\n   - CRITICAL (A4): Guard with 'if response.parsed is None: return None' before accessing .parsed\n   - Replace line-based parsing (lines 414-416) with:\n     parsed = response.parsed\n     tweet_text = parsed.tweet_text\n     generated_hashtag = parsed.hashtag\n     summary_text = parsed.summary\n   - Remove format instructions from prompt ('Format your response as: TWEET:...' section)\n   - Keep all requirements in prompt\n\n**Research Reference:** gemini-structured-output\n**From research - Avoid:** Don't duplicate schema in prompt (reduces quality), don't use typing.List (use list), don't use Field(default=...)",
+      "subtasks": [],
+      "verification": [
+        "SimilarityResult, SelectedArticle, TweetResponse models defined in ai_service.py",
+        "check_content_similarity uses text/x.enum with SimilarityResult",
+        "select_news_articles uses application/json with list[SelectedArticle]",
+        "generate_tweet uses application/json with TweetResponse",
+        "All 3 methods guard for None responses (response.parsed is None / response.text is None)",
+        "No regex parsing remains in select_news_articles",
+        "No line-based string parsing remains in generate_tweet",
+        "Format instructions removed from all 3 prompts",
+        "No Field(default=...) used in any model"
+      ],
+      "summary": null,
+      "completedAt": null
+    },
+    {
+      "number": 4,
+      "title": "Test updates for structured output and final verification",
+      "status": "completed",
+      "priority": "high",
+      "addressesCriteria": ["testing-1", "testing-3"],
+      "researchReferences": ["gemini-structured-output"],
+      "dependencies": [3],
+      "files": ["tests/test_ai_service.py"],
+      "content": "Update existing AI service tests to work with structured output (mock response.parsed instead of response.text) and verify all tests pass.\n\nTasks:\n1. In tests/test_ai_service.py, update TestCandidateSelectionIntegration:\n   - Import the new Pydantic models: from services.ai_service import SelectedArticle\n   - Update mock_ai_service fixture:\n     - Change mock_response.text to also set mock_response.parsed\n     - mock_response.parsed should return a list of SelectedArticle instances:\n       [SelectedArticle(url='https://example.com/article-1', title='Breaking Article 1'),\n        SelectedArticle(url='https://example.com/article-2', title='Article 2')]\n     - Keep mock_response.text for backward compatibility if needed\n\n2. Add new integration test for structured output:\n   - test_select_articles_structured_output: Verify that when response.parsed returns SelectedArticle list, articles are correctly matched against candidate_list\n   - test_select_articles_none_response: Verify fallback when response.parsed is None\n\n3. Add tests for similarity check:\n   - test_similarity_check_similar: Mock response.text = 'SIMILAR', verify returns True\n   - test_similarity_check_different: Mock response.text = 'DIFFERENT', verify returns False\n   - test_similarity_check_none_response: Mock response.text = None, verify returns False (not crash)\n\n4. Add tests for tweet generation:\n   - test_generate_tweet_structured: Mock response.parsed as TweetResponse instance, verify correct dict returned\n   - test_generate_tweet_none_response: Mock response.parsed = None, verify returns None\n\n5. Run full test suite and verify all tests pass.\n\n**Research Reference:** gemini-structured-output - mock response.parsed instead of response.text",
+      "subtasks": [],
+      "verification": [
+        "All existing tests in test_ai_service.py updated to work with structured output",
+        "New tests for None response handling exist and pass",
+        "New tests for structured output parsing exist and pass",
+        "Full test suite passes: pytest tests/ -v",
+        "No test imports or mocks reference the old regex parsing pattern"
+      ],
+      "summary": null,
+      "completedAt": null
+    }
+  ],
+  "researchContext": {
+    "matched": ["gemini-structured-output"],
+    "keywords": ["structured output", "response_schema", "Pydantic", "response.parsed", "text/x.enum"],
+    "staleWarnings": []
+  },
+  "projectContext": {
+    "name": "NewsAnalysisBSkyPoster",
+    "hasProject": false,
+    "constraintsApplied": [],
+    "techStackUsed": ["Python", "google-genai", "Pydantic", "pytest"]
+  },
+  "coverageMatrix": {
+    "functional-1": { "phases": [1] },
+    "functional-2": { "phases": [1] },
+    "functional-3": { "phases": [1] },
+    "functional-4": { "phases": [1] },
+    "functional-5": { "phases": [2] },
+    "functional-6": { "phases": [3] },
+    "functional-7": { "phases": [3] },
+    "functional-8": { "phases": [3] },
+    "non-functional-1": { "phases": [1] },
+    "non-functional-2": { "phases": [1] },
+    "testing-1": { "phases": [4] },
+    "testing-2": { "phases": [2] },
+    "testing-3": { "phases": [4] }
+  },
+  "addressesRequirements": [],
+  "release": { "version": null, "milestone": null },
+  "queue": [],
+  "metadata": {
+    "estimatedPhases": 4,
+    "actualPhases": 4,
+    "parallelizable": false
+  }
+}

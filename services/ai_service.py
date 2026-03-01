@@ -9,10 +9,13 @@ and assessing article similarity.
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 import re
 
 import google.genai as genai
+from google.genai import types
 from atproto import models
+from pydantic import BaseModel, Field
 
 from config import settings
 from utils.logger import get_logger
@@ -28,6 +31,26 @@ class FeedPost:
     url: Optional[str]
     title: Optional[str]
     timestamp: datetime
+
+
+class SimilarityResult(Enum):
+    """Enum for AI similarity check responses."""
+    SIMILAR = "SIMILAR"
+    DIFFERENT = "DIFFERENT"
+
+
+class SelectedArticle(BaseModel):
+    """Model for a selected article from AI article selection."""
+    url: str = Field(description="The exact URL from the candidates list")
+    title: str = Field(description="The exact title from the candidates list")
+
+
+class TweetResponse(BaseModel):
+    """Model for AI-generated tweet/post content."""
+    tweet_text: str = Field(description="Factual social media post under 260 chars")
+    hashtag: str = Field(description="One relevant hashtag without # symbol")
+    summary: str = Field(description="One sentence summary of the article")
+
 
 class AIService:
     """Service for AI operations with Google's Gemini API.
@@ -147,21 +170,27 @@ class AIService:
 
 New Article:
 Title: {article_title}
-Text: {article_text[:settings.AI_COMPARISON_TEXT_LENGTH]}...  
+Text: {article_text[:settings.AI_COMPARISON_TEXT_LENGTH]}...
 
 Recent Post Titles:
 {recent_content}
-
-Return ONLY 'SIMILAR' if they cover the same specific news event, otherwise 'DIFFERENT'.
 """
 
             # Add timeout and error handling
             try:
+                config = types.GenerateContentConfig(
+                    response_mime_type='text/x.enum',
+                    response_schema=SimilarityResult
+                )
                 response = self.client.models.generate_content(
                     model=self.model_name,
-                    contents=prompt
+                    contents=prompt,
+                    config=config
                 )
-                result = response.text.strip().upper() == "SIMILAR"
+                if response.text is None:
+                    logger.warning("AI similarity check returned None response, defaulting to not similar")
+                    return False
+                result = response.text.strip() == "SIMILAR"
                 logger.info(f"AI similarity check for '{article_title[:30]}...': {'SIMILAR' if result else 'DIFFERENT'}")
                 return result
             except AIServiceError:
@@ -279,47 +308,41 @@ Recent posts:
 {recent_titles}
 
 Candidates (format: [Sources: count] Title (URL)):
-{candidate_titles}
-
-Return ONLY the URLs and Titles in this format, ordered from most to least important:
-1. URL: [first URL]
-   TITLE: [first title]
-2. URL: [second URL]
-   TITLE: [second title]
-...and so on"""
+{candidate_titles}"""
 
             try:
-                # Generate content using the model
+                # Generate content using structured output
+                config = types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    response_schema=list[SelectedArticle]
+                )
                 response = self.client.models.generate_content(
                     model=self.model_name,
-                    contents=prompt
+                    contents=prompt,
+                    config=config
                 )
-                response_text = response.text
-                
-                # Parse and extract ranked articles
+
+                if response.parsed is None:
+                    logger.warning("AI article selection returned None parsed response")
+                    raise Exception("Parsed response is None")
+
+                # Extract ranked articles from structured response
                 selected_articles = []
-                
-                # Regular expression to extract numbered items with URL and TITLE
-                pattern = r'(\d+)\.\s+URL:\s+(.*?)\s+TITLE:\s+(.*?)(?=\n\d+\.|\Z)'
-                matches = re.findall(pattern, response_text, re.DOTALL)
-                
-                for _, url, title in matches:
-                    url = url.strip()
-                    title = title.strip()
-                    
-                    # Find the corresponding News_Feed_ID
+                parsed_articles = response.parsed
+                for article in parsed_articles:
+                    url = article.url.strip()
+                    title = article.title.strip()
                     selected_item = next(
                         (item for item in candidate_list if item['URL'] == url),
                         None
                     )
-                    
                     if selected_item:
                         selected_articles.append({
                             'URL': url,
                             'Title': title,
                             'News_Feed_ID': selected_item['News_Feed_ID']
                         })
-                
+
                 if selected_articles:
                     return selected_articles[:max_count]
                 
@@ -387,7 +410,7 @@ Return ONLY the URLs and Titles in this format, ordered from most to least impor
             truncated_text = article_text[:settings.ARTICLE_TEXT_TRUNCATE_LENGTH] if article_text else ""
             
             prompt = f"""Create a brief, informative social media post for the following news article.
-            
+
 Article Title: {article_title}
 Article URL: {article_url}
 Article Content: {truncated_text}
@@ -397,44 +420,37 @@ Requirements:
 2. Include the most important information only (who, what, where, when)
 3. Keep it under {settings.TWEET_CHARACTER_LIMIT} characters (excluding hashtags)
 4. Use neutral, straightforward language
-5. Add ONE relevant hashtag at the end that best represents the subject or category
+5. Add ONE relevant hashtag that best represents the subject or category"""
 
-Format your response as:
-TWEET: [your tweet text]
-HASHTAG: [one relevant hashtag without the # symbol]
-SUMMARY: [one sentence summary of the article]"""
-
+            config = types.GenerateContentConfig(
+                response_mime_type='application/json',
+                response_schema=TweetResponse
+            )
             response = self.client.models.generate_content(
                 model=self.model_name,
-                contents=prompt
+                contents=prompt,
+                config=config
             )
-            response_text = response.text
-            
-            # Extract the components from the response
-            tweet_line = [line for line in response_text.split('\n') if line.startswith('TWEET:')]
-            hashtag_line = [line for line in response_text.split('\n') if line.startswith('HASHTAG:')]
-            summary_line = [line for line in response_text.split('\n') if line.startswith('SUMMARY:')]
-            
-            if not tweet_line:
-                logger.warning("No tweet text found in AI response")
+
+            if response.parsed is None:
+                logger.warning("AI tweet generation returned None parsed response")
                 return None
-                
-            tweet_text = tweet_line[0].replace('TWEET:', '').strip()
-            
-            # Extract the generated hashtag
-            generated_hashtag = None
-            if hashtag_line:
-                generated_hashtag = hashtag_line[0].replace('HASHTAG:', '').strip()
-                # Remove # if it was included
-                if generated_hashtag.startswith('#'):
-                    generated_hashtag = generated_hashtag[1:]
-            
+
+            parsed = response.parsed
+            tweet_text = parsed.tweet_text
+            generated_hashtag = parsed.hashtag
+            summary_text = parsed.summary
+
+            # Remove # if it was included
+            if generated_hashtag.startswith('#'):
+                generated_hashtag = generated_hashtag[1:]
+
             # If no hashtag was found or it's invalid, use a fallback
             if not generated_hashtag or not re.match(r'^\w+$', generated_hashtag):
                 keywords = ["Update", "Breaking", "Latest", "Report"]
                 import random
                 generated_hashtag = random.choice(keywords)
-            
+
             # Add hashtags with proper spacing
             final_tweet = f"{tweet_text} #{generated_hashtag} #News"
             
@@ -476,11 +492,6 @@ SUMMARY: [one sentence summary of the article]"""
                     )
                 )
             )
-            
-            # Get summary if available
-            summary_text = ""
-            if summary_line:
-                summary_text = summary_line[0].replace('SUMMARY:', '').strip()
             
             return {
                 'tweet_text': final_tweet,

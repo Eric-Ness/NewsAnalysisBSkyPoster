@@ -7,7 +7,7 @@ and retrieving feed information.
 """
 
 import json
-from typing import Optional, List, Any, Tuple
+from typing import Optional, List, Any, Dict, Tuple
 from datetime import datetime
 import requests
 
@@ -76,6 +76,27 @@ class SocialService:
             logger.error(f"Failed to authenticate with AT Protocol: {e}")
             return False
     
+    def get_profile_metrics(self) -> Optional[Dict[str, int]]:
+        """
+        Fetch current profile metrics (followers, following, posts count) from BlueSky.
+
+        Returns:
+            Optional[Dict[str, int]]: Dictionary with follower_count, following_count,
+            and total_posts_count, or None if an error occurred.
+        """
+        try:
+            profile = self.at_client.get_profile(self._username)
+            metrics = {
+                'follower_count': getattr(profile, 'followers_count', 0) or 0,
+                'following_count': getattr(profile, 'follows_count', 0) or 0,
+                'total_posts_count': getattr(profile, 'posts_count', 0) or 0,
+            }
+            logger.info(f"Retrieved profile metrics: {metrics}")
+            return metrics
+        except Exception as e:
+            logger.error(f"Error fetching profile metrics: {e}")
+            return None
+
     def get_recent_posts(self, limit: int = settings.BLUESKY_FETCH_LIMIT) -> List[FeedPost]:
         """
         Fetches recent posts from the AT Protocol feed.
@@ -156,10 +177,14 @@ class SocialService:
             if article_image:
                 try:
                     response = requests.get(article_image, timeout=settings.BLUESKY_IMAGE_TIMEOUT)
-                    img_data = response.content
-                    upload = self.at_client.com.atproto.repo.upload_blob(img_data)
-                    thumb = upload.blob
-                    thumb_blob_ref = str(thumb.ref) if hasattr(thumb, 'ref') else None
+                    content_type = response.headers.get('Content-Type', '')
+                    if not content_type.startswith('image/'):
+                        logger.warning(f"Skipping image upload: invalid Content-Type '{content_type}' for {article_image}")
+                    else:
+                        img_data = response.content
+                        upload = self.at_client.com.atproto.repo.upload_blob(img_data)
+                        thumb = upload.blob
+                        thumb_blob_ref = str(thumb.ref) if hasattr(thumb, 'ref') else None
                 except MediaUploadError:
                     raise
                 except Exception as e:

@@ -1,11 +1,26 @@
 {
+  "version": 2,
+  "status": "idle",
   "activeIssue": null,
   "currentPhase": null,
-  "status": "idle",
-  "lastCompletedIssue": 16,
-  "lastCompletedAt": "2026-02-01T17:31:13.078Z",
+  "completedPhases": [],
+  "startedAt": "2026-03-01T19:10:00.000Z",
+  "lastActivity": "2026-03-01T19:25:00.000Z",
+  "lastCompletedIssue": 18,
+  "lastCompletedAt": "2026-03-01T19:25:00.000Z",
   "activeExecutions": [],
   "executionHistory": [
+    {
+      "id": "exec-18-f7a3b9c2",
+      "issue": 18,
+      "issueTitle": "Fix: Bluesky posts failing ~9.3% of runs due to aggressive filtering and unfetchable sources",
+      "status": "completed",
+      "startedAt": "2026-03-01T19:10:00.000Z",
+      "endedAt": "2026-03-01T19:25:00.000Z",
+      "completedPhases": 4,
+      "totalPhases": 4,
+      "summary": "Fixed ~9.3% posting failure rate across 5 root causes: tuned similarity thresholds (0.5->0.7, keyword length 3->4, post limit 72->30), added 4 scrape-blocked domains to PAYWALL_DOMAINS, fixed missing-comma bug in domain_lists.py, added image MIME type validation before upload_blob, and migrated all 3 AI methods to Gemini structured output (eliminating fragile regex/string parsing). All 182 tests pass."
+    },
     {
       "id": "exec-17-90b64315",
       "issue": 17,
@@ -35,17 +50,10 @@
       "status": "completed",
       "startedAt": "2026-02-01T15:07:57.536Z",
       "endedAt": "2026-02-01T17:53:14.600Z",
-      "completedIssues": [
-        17,
-        16
-      ],
+      "completedIssues": [17, 16],
       "failedIssues": [],
       "totalIssues": 2,
       "summary": "Release v1.0.1 completed: 2/2 issues shipped"
     }
-  ],
-  "version": 2,
-  "startedAt": "2026-02-01T17:01:17.072Z",
-  "lastActivity": "2026-02-01T17:53:14.602Z",
-  "completedPhases": []
+  ]
 }
