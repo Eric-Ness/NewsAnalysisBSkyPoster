@@ -554,19 +554,20 @@ Candidate videos (format: [engagement metrics] "Title" by Channel (URL)):
             if content_type == "youtube_video":
                 content_label = "news video"
                 channel_info = f"\nChannel: {channel_name}" if channel_name else ""
-                prompt = f"""Create a brief, informative social media post for the following YouTube news video.
+                prompt = f"""Write an ORIGINAL social media post about the news story described below. Use the title and description only as source material — do NOT copy or closely paraphrase them.
 
 Video Title: {article_title}{channel_info}
 Video URL: {article_url}
 Video Description: {truncated_text}
 
 Requirements:
-1. Be factual and objective - no editorializing or opinions
-2. Include the most important information only (who, what, where, when)
-3. Keep it under {settings.TWEET_CHARACTER_LIMIT} characters (excluding hashtags)
-4. Use neutral, straightforward language
-5. Add ONE relevant hashtag that best represents the subject or category
-6. Do NOT mention that this is a video or use words like "watch" or "video" - just report the news"""
+1. Write your OWN sentence(s) that convey the key facts — do not reuse the title or description wording
+2. Be factual and objective - no editorializing or opinions
+3. Include the most important information only (who, what, where, when)
+4. Keep it under {settings.TWEET_CHARACTER_LIMIT} characters (excluding hashtags)
+5. Use neutral, straightforward language
+6. Add ONE relevant hashtag that best represents the subject or category
+7. Do NOT mention that this is a video or use words like "watch" or "video" - just report the news"""
             else:
                 prompt = f"""Create a brief, informative social media post for the following news article.
 
