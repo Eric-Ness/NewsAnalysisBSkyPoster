@@ -93,9 +93,9 @@ XPATH_MIN_TEXT_LENGTH = 20           # Minimum text length for XPath paragraph e
 # =============================================================================
 
 # Similarity Checking
-SIMILARITY_CHECK_POSTS_LIMIT = 20    # Number of recent posts to compare for similarity
-MIN_KEYWORD_LENGTH = 4               # Minimum word length for keyword matching (strict >; words 5+ chars kept)
-TITLE_SIMILARITY_THRESHOLD = 0.7     # Ratio threshold for title word overlap (0-1)
+SIMILARITY_CHECK_POSTS_LIMIT = 30    # Number of recent posts to compare for similarity
+MIN_KEYWORD_LENGTH = 3               # Minimum word length for keyword matching (strict >; words 4+ chars kept)
+TITLE_SIMILARITY_THRESHOLD = 0.6     # Ratio threshold for title word overlap (0-1)
 AI_COMPARISON_TEXT_LENGTH = 500      # Article text length for AI similarity comparison
 
 # Article Selection
