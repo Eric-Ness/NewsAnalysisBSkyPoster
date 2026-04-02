@@ -80,6 +80,7 @@ class TestFilterCandidates:
                 mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
                 mock_settings.YOUTUBE_BLOCKED_CHANNELS = []
                 mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
                 result = service.filter_candidates(candidates)
 
         assert len(result) == 1
@@ -100,6 +101,7 @@ class TestFilterCandidates:
                 mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
                 mock_settings.YOUTUBE_BLOCKED_CHANNELS = ["@BlockedChannel"]
                 mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
                 result = service.filter_candidates(candidates)
 
         assert len(result) == 1
@@ -120,6 +122,7 @@ class TestFilterCandidates:
                 mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
                 mock_settings.YOUTUBE_BLOCKED_CHANNELS = []
                 mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
                 result = service.filter_candidates(candidates)
 
         assert len(result) == 1
@@ -144,10 +147,37 @@ class TestFilterCandidates:
                     r'\b(opinion|editorial|commentary|my take|my thoughts)\b',
                     r'\b(full (show|episode|program|interview))\b',
                 ]
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
                 result = service.filter_candidates(candidates)
 
         assert len(result) == 1
         assert result[0].title == "Hurricane Makes Landfall in Florida"
+
+    def test_caps_per_channel_diversity(self, mock_youtube_service, youtube_video_candidate_factory):
+        """Should cap videos per channel to ensure source diversity."""
+        service, _, _ = mock_youtube_service
+
+        candidates = [
+            youtube_video_candidate_factory(video_id=1, video_key="vid1key00001", channel_handle="@SameChannel"),
+            youtube_video_candidate_factory(video_id=2, video_key="vid2key00002", channel_handle="@SameChannel"),
+            youtube_video_candidate_factory(video_id=3, video_key="vid3key00003", channel_handle="@SameChannel"),
+            youtube_video_candidate_factory(video_id=4, video_key="vid4key00004", channel_handle="@SameChannel"),
+            youtube_video_candidate_factory(video_id=5, video_key="vid5key00005", channel_handle="@OtherChannel"),
+        ]
+
+        with patch.object(type(service), '_get_posted_urls', return_value=[]):
+            with patch('services.youtube_service.settings') as mock_settings:
+                mock_settings.YOUTUBE_MIN_DURATION_SECONDS = 60
+                mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
+                mock_settings.YOUTUBE_BLOCKED_CHANNELS = []
+                mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 2
+                result = service.filter_candidates(candidates)
+
+        # 2 from @SameChannel (capped at 2) + 1 from @OtherChannel = 3
+        assert len(result) == 3
+        same_channel = [v for v in result if v.channel_handle == "@SameChannel"]
+        assert len(same_channel) == 2
 
     def test_filters_already_posted_urls(self, mock_youtube_service, youtube_video_candidate_factory):
         """Should filter out videos whose URL is already in history."""
@@ -163,6 +193,7 @@ class TestFilterCandidates:
             mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
             mock_settings.YOUTUBE_BLOCKED_CHANNELS = []
             mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+            mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
             result = service.filter_candidates(candidates)
 
         assert len(result) == 0

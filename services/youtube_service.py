@@ -95,6 +95,7 @@ class YouTubeVideoService:
         - Skip blocked channels (YOUTUBE_BLOCKED_CHANNELS)
         - Skip videos whose URL is already in URL history
         - Skip opinion/commentary titles (principle-based editorial filter)
+        - Cap per-channel representation (YOUTUBE_MAX_PER_CHANNEL) for source diversity
 
         Args:
             candidates: List of video candidates to filter.
@@ -105,6 +106,8 @@ class YouTubeVideoService:
         posted_urls = self._get_posted_urls()
         blocked_channels = [h.lower() for h in settings.YOUTUBE_BLOCKED_CHANNELS]
         opinion_patterns = settings.YOUTUBE_OPINION_TITLE_PATTERNS
+        max_per_channel = settings.YOUTUBE_MAX_PER_CHANNEL
+        channel_counts: dict = {}
         filtered = []
 
         for video in candidates:
@@ -133,11 +136,18 @@ class YouTubeVideoService:
                 logger.debug(f"Skipping opinion/commentary title: {video.title}")
                 continue
 
+            # Enforce per-channel diversity cap
+            channel_key = (video.channel_handle or video.channel_name or 'unknown').lower()
+            channel_counts[channel_key] = channel_counts.get(channel_key, 0) + 1
+            if channel_counts[channel_key] > max_per_channel:
+                logger.debug(f"Channel cap reached ({max_per_channel}) for {channel_key}: {video.title}")
+                continue
+
             filtered.append(video)
 
         removed = len(candidates) - len(filtered)
         if removed > 0:
-            logger.info(f"Filtered out {removed} videos (duration/blocked/history/editorial), {len(filtered)} remaining")
+            logger.info(f"Filtered out {removed} videos (duration/blocked/history/editorial/diversity), {len(filtered)} remaining")
 
         return filtered
 

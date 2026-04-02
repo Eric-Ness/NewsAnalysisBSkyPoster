@@ -169,6 +169,7 @@ YOUTUBE_MAX_AGE_DAYS = 3               # Only consider videos from last N days
 YOUTUBE_MIN_VIEWS = 1000               # Minimum view count threshold
 YOUTUBE_MIN_DURATION_SECONDS = 60      # Skip very short videos (under 1 min)
 YOUTUBE_MAX_DURATION_SECONDS = 360     # Skip long show segments (over 6 min)
+YOUTUBE_MAX_PER_CHANNEL = 3            # Max videos per channel in candidate pool (ensures diversity)
 YOUTUBE_CANDIDATE_SELECTION_LIMIT = 50 # Pool size for AI selection
 
 # YouTube Posting Limits
