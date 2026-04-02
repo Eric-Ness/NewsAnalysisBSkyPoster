@@ -38,6 +38,7 @@ class SocialPostData:
     article_image_url: Optional[str] = None
     article_image_blob: Optional[str] = None
     news_feed_id: Optional[int] = None
+    youtube_video_id: Optional[int] = None  # FK to YouTube Video (cross-database, logical only)
     raw_response: Optional[str] = None # JSON string of full API response
 
 

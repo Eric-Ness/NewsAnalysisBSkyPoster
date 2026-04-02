@@ -93,13 +93,13 @@ XPATH_MIN_TEXT_LENGTH = 20           # Minimum text length for XPath paragraph e
 # =============================================================================
 
 # Similarity Checking
-SIMILARITY_CHECK_POSTS_LIMIT = 30    # Number of recent posts to compare for similarity
+SIMILARITY_CHECK_POSTS_LIMIT = 20    # Number of recent posts to compare for similarity
 MIN_KEYWORD_LENGTH = 4               # Minimum word length for keyword matching (strict >; words 5+ chars kept)
 TITLE_SIMILARITY_THRESHOLD = 0.7     # Ratio threshold for title word overlap (0-1)
 AI_COMPARISON_TEXT_LENGTH = 500      # Article text length for AI similarity comparison
 
 # Article Selection
-CANDIDATE_SELECTION_LIMIT = 60       # Number of candidates to randomize from pool
+CANDIDATE_SELECTION_LIMIT = 90       # Number of candidates to randomize from pool
 
 # Tweet Generation
 ARTICLE_TEXT_TRUNCATE_LENGTH = 4000  # Max article text length sent to AI for tweet
@@ -126,10 +126,12 @@ TWITTER_IMAGE_TIMEOUT = 10           # Seconds timeout for image download
 # Database Query Settings
 # =============================================================================
 
-DB_TOTAL_NEWS_FEED_RESULTS = 160     # Total articles to fetch from news feed
-DB_CAT1_ALLOCATION = 0.5             # Category 1 (World) allocation percentage
-DB_CAT2_ALLOCATION = 0.4             # Category 2 (National) allocation percentage
-# Category 3 (Business) gets remainder: 1 - CAT1 - CAT2 = 0.1 (10%)
+DB_TOTAL_NEWS_FEED_RESULTS = 300     # Total articles to fetch from news feed
+DB_CAT1_ALLOCATION = 0.23            # Category 1 (World) ~23%
+DB_CAT2_ALLOCATION = 0.23            # Category 2 (National) ~23%
+DB_CAT3_ALLOCATION = 0.18            # Category 3 (Business) ~18%
+DB_CAT4_ALLOCATION = 0.18            # Category 4 (Technology) ~18%
+DB_CAT7_ALLOCATION = 0.18            # Category 7 (Science) ~18% (remainder)
 
 # Web Scraping Settings
 USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
@@ -141,6 +143,52 @@ REQUEST_HEADERS = {
     'Connection': 'keep-alive',
     'Upgrade-Insecure-Requests': '1'
 }
+
+# =============================================================================
+# YouTube Settings
+# =============================================================================
+
+YOUTUBE_DB_NAME = os.getenv("YOUTUBE_DB_NAME", "NewsAnalysis.YouTube")
+
+# Build YouTube connection string (same server/creds, different database)
+YOUTUBE_DB_CONNECTION_STRING = (
+    f"DRIVER={{ODBC Driver 18 for SQL Server}}; "
+    f"SERVER={DB_SERVER}; "
+    f"DATABASE={YOUTUBE_DB_NAME}; "
+    f"UID={DB_USER}; "
+    f"PWD={DB_PASSWORD}; "
+    f"TrustServerCertificate=yes; MARS_Connection=yes;"
+) if all([DB_SERVER, YOUTUBE_DB_NAME, DB_USER, DB_PASSWORD]) else ""
+
+# YouTube Posting Feature Flag
+ENABLE_YOUTUBE_POSTING = os.getenv("ENABLE_YOUTUBE_POSTING", "false").lower() in ("true", "1", "yes")
+
+# YouTube Candidate Selection
+YOUTUBE_MAX_CANDIDATES = 100           # Videos to fetch from DB
+YOUTUBE_MAX_AGE_DAYS = 3               # Only consider videos from last N days
+YOUTUBE_MIN_VIEWS = 1000               # Minimum view count threshold
+YOUTUBE_MIN_DURATION_SECONDS = 60      # Skip very short videos (under 1 min)
+YOUTUBE_MAX_DURATION_SECONDS = 360     # Skip long show segments (over 6 min)
+YOUTUBE_CANDIDATE_SELECTION_LIMIT = 50 # Pool size for AI selection
+
+# YouTube Posting Limits
+YOUTUBE_MAX_POSTS_PER_RUN = 1          # Maximum videos to post per run
+YOUTUBE_MAX_RETRIES = 15               # Max video candidates to try before giving up
+
+# YouTube Channel Blocklist (channel handles to skip)
+YOUTUBE_BLOCKED_CHANNELS: list = []
+
+# YouTube Editorial Filters (principle-based, channel-agnostic)
+# Title patterns that indicate opinion/commentary rather than straight news reporting
+YOUTUBE_OPINION_TITLE_PATTERNS: list = [
+    r'\b(opinion|editorial|commentary|my take|my thoughts)\b',
+    r'\b(rant|reacts?|reaction|claps? back|destroys?|slams?|owned|obliterat)',
+    r'\b(debate|panel discussion|roundtable)\b',
+    r'^(WATCH|LISTEN|MUST SEE|YOU WON\'T BELIEVE)',
+    r'\b(top \d+|ranking|rated|best of|worst of)\b',
+    r'\b(full (show|episode|program|interview))\b',
+    r'\b(highlights?|recap|compilation|montage)\b',
+]
 
 # =============================================================================
 # Domain Lists and Content Filtering

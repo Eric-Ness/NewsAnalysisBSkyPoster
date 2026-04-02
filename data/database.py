@@ -16,10 +16,10 @@ from utils.exceptions import DatabaseError, QueryError
 from utils.exceptions import ConnectionError as DatabaseConnectionError
 
 # Import SocialPostData from models and re-export for backward compatibility
-from data.models import SocialPostData
+from data.models import SocialPostData, BlueSkyDailyMetrics, YouTubeVideoCandidate
 
 # Re-export for backward compatibility (allows: from data.database import SocialPostData)
-__all__ = ['DatabaseConnection', 'SocialPostData', 'db']
+__all__ = ['DatabaseConnection', 'SocialPostData', 'BlueSkyDailyMetrics', 'YouTubeVideoCandidate', 'db']
 
 logger = logging.getLogger(__name__)
 
@@ -113,21 +113,26 @@ class DatabaseConnection:
         total_results = settings.DB_TOTAL_NEWS_FEED_RESULTS
         cat1_alloc = settings.DB_CAT1_ALLOCATION
         cat2_alloc = settings.DB_CAT2_ALLOCATION
+        cat3_alloc = settings.DB_CAT3_ALLOCATION
+        cat4_alloc = settings.DB_CAT4_ALLOCATION
+        cat7_alloc = settings.DB_CAT7_ALLOCATION
 
         query = f"""
         DECLARE @TotalResults INT = {total_results};
-        DECLARE @Cat1Target INT = CAST(@TotalResults * {cat1_alloc} AS INT); -- {int(cat1_alloc*100)}% for Category 1
-        DECLARE @Cat2Target INT = CAST(@TotalResults * {cat2_alloc} AS INT); -- {int(cat2_alloc*100)}% for Category 2
-        DECLARE @Cat3Target INT = @TotalResults - @Cat1Target - @Cat2Target; -- 10% for Category 3 (18)
+        DECLARE @Cat1Target INT = CAST(@TotalResults * {cat1_alloc} AS INT); -- ~23% for Category 1 (World)
+        DECLARE @Cat2Target INT = CAST(@TotalResults * {cat2_alloc} AS INT); -- ~23% for Category 2 (National)
+        DECLARE @Cat3Target INT = CAST(@TotalResults * {cat3_alloc} AS INT); -- ~18% for Category 3 (Business)
+        DECLARE @Cat4Target INT = CAST(@TotalResults * {cat4_alloc} AS INT); -- ~18% for Category 4 (Technology)
+        DECLARE @Cat7Target INT = @TotalResults - @Cat1Target - @Cat2Target - @Cat3Target - @Cat4Target; -- remainder ~18% for Category 7 (Science)
 
         WITH AllSources AS (
             -- Get all eligible items and rank them by Source_Count within each category
-            SELECT 
+            SELECT
                 URL, Title, Source_Count, News_Feed_ID, Used_In_BSky, Used_In_Twitter, Category_ID,
                 ROW_NUMBER() OVER (PARTITION BY Category_ID ORDER BY Source_Count DESC, NEWID()) as RowNum
             FROM [NewsAnalysis].[dbo].[tbl_News_Feed]
             WHERE Language_ID = 23
-            AND (Category_ID = 1 OR Category_ID = 2 OR Category_ID = 3)
+            AND Category_ID IN (1, 2, 3, 4, 7)
             AND [Published_Date] >= DATEADD(day, -1, GETDATE())
             AND Source_Count > 0
             AND Used_In_BSky = 0
@@ -135,7 +140,7 @@ class DatabaseConnection:
         ),
         AvailableCounts AS (
             -- Count total available records for each category
-            SELECT 
+            SELECT
                 Category_ID,
                 COUNT(*) AS TotalCount
             FROM AllSources
@@ -150,14 +155,20 @@ class DatabaseConnection:
                     WHEN a.Category_ID = 1 THEN @Cat1Target
                     WHEN a.Category_ID = 2 THEN @Cat2Target
                     WHEN a.Category_ID = 3 THEN @Cat3Target
+                    WHEN a.Category_ID = 4 THEN @Cat4Target
+                    WHEN a.Category_ID = 7 THEN @Cat7Target
                 END AS TargetCount,
                 CASE
                     WHEN a.Category_ID = 1 AND a.TotalCount < @Cat1Target THEN a.TotalCount
                     WHEN a.Category_ID = 2 AND a.TotalCount < @Cat2Target THEN a.TotalCount
                     WHEN a.Category_ID = 3 AND a.TotalCount < @Cat3Target THEN a.TotalCount
+                    WHEN a.Category_ID = 4 AND a.TotalCount < @Cat4Target THEN a.TotalCount
+                    WHEN a.Category_ID = 7 AND a.TotalCount < @Cat7Target THEN a.TotalCount
                     WHEN a.Category_ID = 1 THEN @Cat1Target
                     WHEN a.Category_ID = 2 THEN @Cat2Target
                     WHEN a.Category_ID = 3 THEN @Cat3Target
+                    WHEN a.Category_ID = 4 THEN @Cat4Target
+                    WHEN a.Category_ID = 7 THEN @Cat7Target
                 END AS AdjustedTarget
             FROM AvailableCounts a
         ),
@@ -351,10 +362,10 @@ class DatabaseConnection:
             [Author_Handle], [Author_Display_Name], [Author_Avatar_URL], [Author_DID],
             [Post_Text], [Post_Facets],
             [Article_URL], [Article_Title], [Article_Description], [Article_Image_URL], [Article_Image_Blob],
-            [Created_At], [News_Feed_ID], [Raw_Response]
+            [Created_At], [News_Feed_ID], [YouTube_Video_ID], [Raw_Response]
         )
         OUTPUT INSERTED.Social_Post_ID
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
 
         if not self.conn and not self.connect():
@@ -380,6 +391,7 @@ class DatabaseConnection:
                 post_data.article_image_blob,
                 post_data.created_at,
                 post_data.news_feed_id,
+                getattr(post_data, 'youtube_video_id', None),
                 post_data.raw_response
             ))
 
@@ -461,6 +473,221 @@ class DatabaseConnection:
             ORDER BY [Created_At] DESC
             """
             return self.execute_query(query, (limit,))
+
+    def upsert_daily_metrics(self, metrics: BlueSkyDailyMetrics) -> Optional[int]:
+        """
+        Insert or update daily BlueSky metrics for a given date.
+        If a record already exists for the snapshot_date, it will be updated.
+
+        Args:
+            metrics: BlueSkyDailyMetrics object containing the metrics data.
+
+        Returns:
+            Optional[int]: The Metric_ID of the upserted record, or None if an error occurred.
+        """
+        query = """
+        MERGE [dbo].[tbl_BlueSky_Daily_Metrics] AS target
+        USING (SELECT ? AS Snapshot_Date) AS source
+        ON target.[Snapshot_Date] = source.Snapshot_Date
+        WHEN MATCHED THEN
+            UPDATE SET
+                [Follower_Count] = ?,
+                [Following_Count] = ?,
+                [Total_Posts_Count] = ?,
+                [Stories_Posted] = ?,
+                [Stories_Skipped] = ?,
+                [Daily_Likes] = ?,
+                [Daily_Reposts] = ?,
+                [Daily_Replies] = ?,
+                [Daily_Quotes] = ?,
+                [Daily_Impressions] = ?,
+                [New_Followers] = ?,
+                [New_Unfollowers] = ?,
+                [Updated_At] = GETDATE()
+        WHEN NOT MATCHED THEN
+            INSERT (
+                [Snapshot_Date], [Follower_Count], [Following_Count], [Total_Posts_Count],
+                [Stories_Posted], [Stories_Skipped],
+                [Daily_Likes], [Daily_Reposts], [Daily_Replies], [Daily_Quotes], [Daily_Impressions],
+                [New_Followers], [New_Unfollowers]
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        OUTPUT INSERTED.Metric_ID;
+        """
+
+        if not self.conn and not self.connect():
+            return None
+
+        try:
+            cursor = self.conn.cursor()
+            params = (
+                # ON clause
+                metrics.snapshot_date,
+                # UPDATE values
+                metrics.follower_count, metrics.following_count, metrics.total_posts_count,
+                metrics.stories_posted, metrics.stories_skipped,
+                metrics.daily_likes, metrics.daily_reposts, metrics.daily_replies,
+                metrics.daily_quotes, metrics.daily_impressions,
+                metrics.new_followers, metrics.new_unfollowers,
+                # INSERT values
+                metrics.snapshot_date,
+                metrics.follower_count, metrics.following_count, metrics.total_posts_count,
+                metrics.stories_posted, metrics.stories_skipped,
+                metrics.daily_likes, metrics.daily_reposts, metrics.daily_replies,
+                metrics.daily_quotes, metrics.daily_impressions,
+                metrics.new_followers, metrics.new_unfollowers,
+            )
+            cursor.execute(query, params)
+            row = cursor.fetchone()
+            self.conn.commit()
+
+            if row:
+                metric_id = row[0]
+                logger.info(f"Successfully upserted daily metrics - Metric_ID: {metric_id}, Date: {metrics.snapshot_date}")
+                return metric_id
+            return None
+
+        except (QueryError, DatabaseError):
+            raise
+        except Exception as e:
+            logger.error(f"Error upserting daily metrics: {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+            return None
+
+    def get_daily_metrics(self, snapshot_date) -> Optional[Dict]:
+        """
+        Retrieve daily metrics for a specific date.
+
+        Args:
+            snapshot_date: The date to look up (date or string 'YYYY-MM-DD').
+
+        Returns:
+            Optional[Dict]: The metrics data as a dictionary, or None if not found.
+        """
+        query = """
+        SELECT * FROM [dbo].[tbl_BlueSky_Daily_Metrics]
+        WHERE [Snapshot_Date] = ?
+        """
+        results = self.execute_query(query, (snapshot_date,))
+        return results[0] if results else None
+
+    def get_daily_metrics_range(self, start_date, end_date) -> Optional[List[Dict]]:
+        """
+        Retrieve daily metrics for a date range.
+
+        Args:
+            start_date: Start date (inclusive).
+            end_date: End date (inclusive).
+
+        Returns:
+            Optional[List[Dict]]: List of metrics dictionaries, or None if error.
+        """
+        query = """
+        SELECT * FROM [dbo].[tbl_BlueSky_Daily_Metrics]
+        WHERE [Snapshot_Date] BETWEEN ? AND ?
+        ORDER BY [Snapshot_Date] DESC
+        """
+        return self.execute_query(query, (start_date, end_date))
+
+    def get_latest_daily_metrics(self, days: int = 30) -> Optional[List[Dict]]:
+        """
+        Retrieve the most recent daily metrics.
+
+        Args:
+            days: Number of days to look back (default 30).
+
+        Returns:
+            Optional[List[Dict]]: List of metrics dictionaries, or None if error.
+        """
+        query = """
+        SELECT * FROM [dbo].[tbl_BlueSky_Daily_Metrics]
+        WHERE [Snapshot_Date] >= DATEADD(day, ?, CAST(GETDATE() AS DATE))
+        ORDER BY [Snapshot_Date] DESC
+        """
+        return self.execute_query(query, (-days,))
+
+    def increment_stories_posted(self, snapshot_date) -> bool:
+        """
+        Increment the Stories_Posted count for a given date by 1.
+        Creates the record if it doesn't exist.
+
+        Args:
+            snapshot_date: The date to increment (date or string 'YYYY-MM-DD').
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        query = """
+        MERGE [dbo].[tbl_BlueSky_Daily_Metrics] AS target
+        USING (SELECT ? AS Snapshot_Date) AS source
+        ON target.[Snapshot_Date] = source.Snapshot_Date
+        WHEN MATCHED THEN
+            UPDATE SET [Stories_Posted] = [Stories_Posted] + 1, [Updated_At] = GETDATE()
+        WHEN NOT MATCHED THEN
+            INSERT ([Snapshot_Date], [Stories_Posted]) VALUES (?, 1);
+        """
+
+        if not self.conn and not self.connect():
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, (snapshot_date, snapshot_date))
+            self.conn.commit()
+            logger.info(f"Incremented stories posted for {snapshot_date}")
+            return True
+        except (QueryError, DatabaseError):
+            raise
+        except Exception as e:
+            logger.error(f"Error incrementing stories posted: {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+            return False
+
+    def increment_stories_skipped(self, snapshot_date) -> bool:
+        """
+        Increment the Stories_Skipped count for a given date by 1.
+        Creates the record if it doesn't exist.
+
+        Args:
+            snapshot_date: The date to increment (date or string 'YYYY-MM-DD').
+
+        Returns:
+            bool: True if successful, False otherwise.
+        """
+        query = """
+        MERGE [dbo].[tbl_BlueSky_Daily_Metrics] AS target
+        USING (SELECT ? AS Snapshot_Date) AS source
+        ON target.[Snapshot_Date] = source.Snapshot_Date
+        WHEN MATCHED THEN
+            UPDATE SET [Stories_Skipped] = [Stories_Skipped] + 1, [Updated_At] = GETDATE()
+        WHEN NOT MATCHED THEN
+            INSERT ([Snapshot_Date], [Stories_Skipped]) VALUES (?, 1);
+        """
+
+        if not self.conn and not self.connect():
+            return False
+
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(query, (snapshot_date, snapshot_date))
+            self.conn.commit()
+            logger.info(f"Incremented stories skipped for {snapshot_date}")
+            return True
+        except (QueryError, DatabaseError):
+            raise
+        except Exception as e:
+            logger.error(f"Error incrementing stories skipped: {e}")
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+            return False
 
 
 # Create a default database instance for use throughout the application

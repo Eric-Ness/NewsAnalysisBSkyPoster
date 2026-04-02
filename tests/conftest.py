@@ -793,3 +793,94 @@ def mock_twitter_service(mock_post_storage):
     )
 
     return service, mock_client, mock_post_storage
+
+
+# =============================================================================
+# YouTube Fixtures
+# =============================================================================
+
+@pytest.fixture
+def youtube_video_candidate_factory():
+    """
+    Factory fixture for creating YouTubeVideoCandidate test objects.
+
+    Returns:
+        callable: A factory function for creating YouTubeVideoCandidate objects.
+    """
+    from data.models import YouTubeVideoCandidate
+
+    def _create_candidate(
+        video_id: int = 1,
+        video_key: str = "dQw4w9WgXcQ",
+        title: Optional[str] = None,
+        description: str = "Test video description for unit testing.",
+        published_date: Optional[datetime] = None,
+        thumbnail_url: Optional[str] = None,
+        duration_seconds: int = 300,
+        view_count: int = 50000,
+        like_count: int = 1500,
+        comment_count: int = 200,
+        channel_name: str = "CNN",
+        channel_handle: str = "@CNN",
+        **kwargs
+    ) -> YouTubeVideoCandidate:
+        if published_date is None:
+            published_date = datetime.now()
+        if thumbnail_url is None:
+            thumbnail_url = f"https://i.ytimg.com/vi/{video_key}/maxresdefault.jpg"
+
+        return YouTubeVideoCandidate(
+            youtube_video_id=video_id,
+            youtube_video_key=video_key,
+            title=title or f"Test Video {video_id}: Breaking News Report",
+            description=description,
+            published_date=published_date,
+            thumbnail_url=thumbnail_url,
+            duration_seconds=duration_seconds,
+            view_count=view_count,
+            like_count=like_count,
+            comment_count=comment_count,
+            channel_name=channel_name,
+            channel_handle=channel_handle,
+        )
+
+    return _create_candidate
+
+
+@pytest.fixture
+def mock_youtube_db():
+    """
+    Mock the YouTube database connection.
+
+    Returns:
+        MagicMock: A mock YouTubeDatabaseConnection.
+    """
+    mock_db = MagicMock()
+    mock_db.connect.return_value = True
+    mock_db.mark_video_posted.return_value = True
+    mock_db.get_youtube_candidates.return_value = None
+    mock_db.get_video_by_key.return_value = None
+    return mock_db
+
+
+@pytest.fixture
+def mock_youtube_service(mock_youtube_db, tmp_path):
+    """
+    Create a YouTubeVideoService with DI configuration for testing.
+
+    Returns:
+        tuple: (YouTubeVideoService instance, mock YouTube DB, path to history file)
+    """
+    from services.youtube_service import YouTubeVideoService
+
+    history_file = tmp_path / "test_posted_urls.txt"
+    history_file.write_text("")
+
+    service = YouTubeVideoService(
+        youtube_database=mock_youtube_db,
+        url_history_file=str(history_file),
+        max_history_lines=50,
+        cleanup_threshold=5,
+    )
+
+    return service, mock_youtube_db, history_file

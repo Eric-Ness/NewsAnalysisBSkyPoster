@@ -14,6 +14,7 @@ import re
 import argparse
 import logging
 import pandas as pd
+from datetime import date
 from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse
 
@@ -113,6 +114,9 @@ class NewsPoster:
         logger.info(f"Enabled platforms for this run: {', '.join(platforms)}")
         
         try:
+            # Track today's date for metrics
+            today = date.today()
+
             # 1. Get news feed data from database
             news_feed_data = db.get_news_feed()
             if news_feed_data is None or len(news_feed_data) == 0:
@@ -173,6 +177,7 @@ class NewsPoster:
                 # 4. Check if article URL is in history
                 if self.article_service.is_url_in_history(selected_article['URL']):
                     logger.warning(f"Article URL already in history: {selected_article['URL']}")
+                    db.increment_stories_skipped(today)
                     continue
                     
                 # 5. Get the real URL (if it's a Google News URL)
@@ -186,17 +191,20 @@ class NewsPoster:
                         # Check if resolved URL is from a blocked domain
                         if is_domain_match(real_url, settings.BLOCKED_DOMAINS):
                             logger.warning(f"Resolved URL is from blocked domain: {real_url}")
+                            db.increment_stories_skipped(today)
                             continue
 
                         # Check .gov and .mil TLDs using proper domain extraction
                         resolved_domain = extract_base_domain(real_url)
                         if resolved_domain and (resolved_domain.endswith('.gov') or resolved_domain.endswith('.mil')):
                             logger.warning(f"Resolved URL is from .gov/.mil domain: {real_url}")
+                            db.increment_stories_skipped(today)
                             continue
 
                         # Check paywall domains
                         if is_domain_match(real_url, settings.PAYWALL_DOMAINS):
                             logger.warning(f"Resolved URL is from paywall domain: {real_url}")
+                            db.increment_stories_skipped(today)
                             continue
                 
                 # 6. Fetch the selected article content
@@ -207,6 +215,7 @@ class NewsPoster:
                 
                 if not article_content:
                     logger.warning(f"Failed to fetch article content for: {selected_article['Title']}")
+                    db.increment_stories_skipped(today)
                     continue
                     
                 # 7. Check for content similarity with recent posts
@@ -216,6 +225,7 @@ class NewsPoster:
                     recent_posts
                 ):
                     logger.warning(f"Article content too similar to recent posts: {article_content.title}")
+                    db.increment_stories_skipped(today)
                     continue
                     
                 # 8. Generate social media content
@@ -227,6 +237,7 @@ class NewsPoster:
                 
                 if not tweet_data:
                     logger.warning(f"Failed to generate social media content for: {article_content.title}")
+                    db.increment_stories_skipped(today)
                     continue
                 
                 # Track success across platforms
@@ -249,6 +260,9 @@ class NewsPoster:
                             logger.info(f"Successfully posted to BlueSky: {article_content.title}")
                             if bsky_social_post_id:
                                 logger.info(f"BlueSky post stored with Social_Post_ID: {bsky_social_post_id}")
+
+                            # Track daily metrics
+                            db.increment_stories_posted(today)
 
                             # Update database for BlueSky post
                             db.update_news_feed(
@@ -303,8 +317,9 @@ class NewsPoster:
                     logger.info(f"Social media text: {tweet_data['tweet_text']}")
                     success = True
                 
-                # If we got here with success, we're done
+                # If we got here with success, record profile metrics and we're done
                 if success:
+                    self._record_profile_metrics(today, platforms)
                     return True
             
             # If we tried all articles and none worked
@@ -329,6 +344,35 @@ class NewsPoster:
         except Exception as e:
             logger.error(f"Unexpected error in NewsAnalyzer process_news_feed: {e}", exc_info=True)
             return False
+
+
+    def _record_profile_metrics(self, today: date, platforms: List[str]) -> None:
+        """Fetch BlueSky profile stats and upsert today's daily metrics row."""
+        if "bluesky" not in platforms:
+            return
+
+        try:
+            profile_metrics = self.social_service.get_profile_metrics()
+            if not profile_metrics:
+                return
+
+            # Get existing row for today (may have stories_posted/skipped already)
+            existing = db.get_daily_metrics(today)
+
+            from data.models import BlueSkyDailyMetrics
+            metrics = BlueSkyDailyMetrics(
+                snapshot_date=today,
+                follower_count=profile_metrics['follower_count'],
+                following_count=profile_metrics['following_count'],
+                total_posts_count=profile_metrics['total_posts_count'],
+                # Preserve counters that were already incremented during the run
+                stories_posted=existing['Stories_Posted'] if existing else 0,
+                stories_skipped=existing['Stories_Skipped'] if existing else 0,
+            )
+            db.upsert_daily_metrics(metrics)
+            logger.info(f"Recorded daily profile metrics for {today}")
+        except Exception as e:
+            logger.error(f"Failed to record daily profile metrics: {e}")
 
 
 def create_news_poster(

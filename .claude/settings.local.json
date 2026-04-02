@@ -23,7 +23,8 @@
       "Bash(git clone:*)",
       "Bash(ls:*)",
       "Bash(gh api:*)",
-      "Bash(C:/Users/Administrator/AppData/Local/Programs/Python/Python312/python.exe -m pip install -r requirements.txt)"
+      "Bash(C:/Users/Administrator/AppData/Local/Programs/Python/Python312/python.exe -m pip install -r requirements.txt)",
+      "Bash(gh repo view:*)"
     ],
     "deny": [],
     "ask": []

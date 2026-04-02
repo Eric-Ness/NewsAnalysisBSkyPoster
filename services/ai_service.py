@@ -45,6 +45,12 @@ class SelectedArticle(BaseModel):
     title: str = Field(description="The exact title from the candidates list")
 
 
+class SelectedVideo(BaseModel):
+    """Model for a selected YouTube video from AI video selection."""
+    url: str = Field(description="The exact YouTube URL from the candidates list")
+    title: str = Field(description="The exact title from the candidates list")
+
+
 class TweetResponse(BaseModel):
     """Model for AI-generated tweet/post content."""
     tweet_text: str = Field(description="Factual social media post under 260 chars")
@@ -393,7 +399,143 @@ Candidates (format: [Sources: count] Title (URL)):
         articles = self.select_news_articles(candidates, recent_posts, max_count=1)
         return articles[0] if articles else None
     
-    def generate_tweet(self, article_text: str, article_title: str, article_url: str) -> Optional[Dict[str, Any]]:
+    def select_youtube_videos(
+        self,
+        candidates: List[Dict[str, Any]],
+        recent_posts: List[FeedPost],
+        max_count: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Selects the most newsworthy YouTube videos from a list of candidates.
+
+        Args:
+            candidates: List of video candidate dicts with YouTube_Video_ID, Title, Description,
+                       View_Count, Like_Count, Comment_Count, Duration_Seconds, Channel_Name, url.
+            recent_posts: Recent feed posts to avoid topic duplication.
+            max_count: Maximum number of videos to select.
+
+        Returns:
+            List[Dict]: Selected videos in priority order, empty list if none selected.
+        """
+        try:
+            import random
+
+            # Format engagement numbers for readability
+            def format_count(n: int) -> str:
+                if n >= 1_000_000:
+                    return f"{n / 1_000_000:.1f}M"
+                elif n >= 1_000:
+                    return f"{n / 1_000:.1f}K"
+                return str(n)
+
+            def format_duration(seconds: int) -> str:
+                if seconds >= 3600:
+                    return f"{seconds // 3600}h{(seconds % 3600) // 60}m"
+                return f"{seconds // 60}min"
+
+            # Randomize to avoid always picking the same top-engagement videos
+            candidate_list = list(candidates)
+            # Keep top engagement videos first, then shuffle the rest
+            top_count = min(len(candidate_list) // 3, settings.YOUTUBE_CANDIDATE_SELECTION_LIMIT // 2)
+            top_candidates = candidate_list[:top_count]
+            rest_candidates = candidate_list[top_count:]
+            random.shuffle(rest_candidates)
+            candidate_list = (top_candidates + rest_candidates)[:settings.YOUTUBE_CANDIDATE_SELECTION_LIMIT]
+
+            # Generate recent post titles for dedup
+            recent_titles = "\n".join([
+                f"- {post.title}" for post in recent_posts if post.title
+            ])
+
+            # Format candidates with engagement metrics
+            candidate_entries = "\n".join([
+                f"- [Views: {format_count(item.get('View_Count', 0))} | "
+                f"Likes: {format_count(item.get('Like_Count', 0))} | "
+                f"Comments: {format_count(item.get('Comment_Count', 0))} | "
+                f"{format_duration(item.get('Duration_Seconds', 0))}] "
+                f"\"{item['Title']}\" by {item.get('Channel_Name', 'Unknown')} ({item['url']})"
+                for item in candidate_list
+            ])
+
+            prompt = f"""You are a senior news editor in the tradition of Edward R. Murrow — committed to factual, objective, straight-news reporting. Select the {max_count} most newsworthy videos for a general English-speaking audience.
+
+EDITORIAL STANDARD:
+- Factual reporting only: hard news about events, developments, and their consequences
+- Objective and impartial: no partisan lean, no advocacy, no taking sides
+- Single news items preferred: one clearly defined story, not a multi-topic show segment
+- Duration sweet spot: 1-5 minute focused reports are ideal; long panel discussions or full shows are not
+
+SELECTION CRITERIA (in priority order):
+1. NEWSWORTHINESS: Breaking news, major developments, or stories with real-world consequences
+2. STRAIGHT NEWS: Factual reporting with clear who/what/where/when — not opinion, analysis shows, or commentary
+3. ENGLISH LANGUAGE: Only select videos that are clearly in English (English title, English-language channel)
+4. ENGAGEMENT: Higher view counts and likes suggest broader public interest
+5. DIVERSITY: Cover different topics — do not select multiple videos about the same event
+6. RECENCY: Prefer more recent videos when newsworthiness is comparable
+
+MUST AVOID:
+- Opinion, commentary, editorial, or analysis programs (even from reputable channels)
+- Partisan or advocacy content from any political perspective
+- Talk shows, panel discussions, debate formats, or interview-heavy segments
+- Celebrity gossip, sports highlights, or entertainment content
+- Promotional, sponsored, or corporate content
+- Clickbait, sensationalized, or emotionally manipulative titles
+- Non-English language content
+- Compilation, recap, or highlight reel videos
+- Videos too similar to the recent posts listed below
+
+Recent posts (avoid similar topics):
+{recent_titles}
+
+Candidate videos (format: [engagement metrics] "Title" by Channel (URL)):
+{candidate_entries}"""
+
+            try:
+                config = types.GenerateContentConfig(
+                    response_mime_type='application/json',
+                    response_schema=list[SelectedVideo]
+                )
+                response = self.client.models.generate_content(
+                    model=self.model_name,
+                    contents=prompt,
+                    config=config
+                )
+
+                if response.parsed is None:
+                    logger.warning("AI YouTube video selection returned None parsed response")
+                    raise Exception("Parsed response is None")
+
+                selected_videos = []
+                for video in response.parsed:
+                    url = video.url.strip()
+                    title = video.title.strip()
+                    selected_item = next(
+                        (item for item in candidate_list if item['url'] == url),
+                        None
+                    )
+                    if selected_item:
+                        selected_videos.append(selected_item)
+
+                if selected_videos:
+                    return selected_videos[:max_count]
+
+            except ArticleSelectionError:
+                raise
+            except Exception as e:
+                logger.error(f"Error parsing AI response for YouTube video selection: {e}")
+
+            # Fallback: use top candidates if AI selection fails
+            logger.warning("Falling back to direct YouTube candidate selection")
+            return candidate_list[:max_count]
+
+        except ArticleSelectionError:
+            raise
+        except Exception as e:
+            logger.error(f"Error selecting YouTube videos: {e}")
+            return candidates[:max_count] if candidates else []
+
+    def generate_tweet(self, article_text: str, article_title: str, article_url: str,
+                       content_type: str = "article", channel_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Generate a tweet-like post for an article using AI, including hashtags and facets.
         
@@ -408,8 +550,25 @@ Candidates (format: [Sources: count] Title (URL)):
         try:
             # Limit article text to reduce token usage
             truncated_text = article_text[:settings.ARTICLE_TEXT_TRUNCATE_LENGTH] if article_text else ""
-            
-            prompt = f"""Create a brief, informative social media post for the following news article.
+
+            if content_type == "youtube_video":
+                content_label = "news video"
+                channel_info = f"\nChannel: {channel_name}" if channel_name else ""
+                prompt = f"""Create a brief, informative social media post for the following YouTube news video.
+
+Video Title: {article_title}{channel_info}
+Video URL: {article_url}
+Video Description: {truncated_text}
+
+Requirements:
+1. Be factual and objective - no editorializing or opinions
+2. Include the most important information only (who, what, where, when)
+3. Keep it under {settings.TWEET_CHARACTER_LIMIT} characters (excluding hashtags)
+4. Use neutral, straightforward language
+5. Add ONE relevant hashtag that best represents the subject or category
+6. Do NOT mention that this is a video or use words like "watch" or "video" - just report the news"""
+            else:
+                prompt = f"""Create a brief, informative social media post for the following news article.
 
 Article Title: {article_title}
 Article URL: {article_url}

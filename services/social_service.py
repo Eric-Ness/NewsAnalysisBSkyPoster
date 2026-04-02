@@ -155,17 +155,19 @@ class SocialService:
     
     def post_to_social(self, tweet_text: str, article_url: str, article_title: str,
                        article_image: Optional[str] = None, facets: Optional[List[Any]] = None,
-                       news_feed_id: Optional[int] = None) -> Tuple[bool, Optional[int]]:
+                       news_feed_id: Optional[int] = None,
+                       youtube_video_id: Optional[int] = None) -> Tuple[bool, Optional[int]]:
         """
         Post content to the AT Protocol feed.
 
         Args:
             tweet_text: The text to post
-            article_url: The URL of the article
-            article_title: The title of the article
+            article_url: The URL of the article or YouTube video
+            article_title: The title of the article or video
             article_image: The URL of an image to include (optional)
             facets: Rich text facets for formatting (optional)
-            news_feed_id: The News_Feed_ID for linking to the source article (optional)
+            news_feed_id: The News_Feed_ID for linking to a news article (optional)
+            youtube_video_id: The YouTube_Video_ID for linking to a YouTube video (optional)
 
         Returns:
             Tuple[bool, Optional[int]]: (success, social_post_id) - success status and the ID of the stored post record
@@ -256,6 +258,7 @@ class SocialService:
                     article_image_url=article_image,
                     article_image_blob=thumb_blob_ref,
                     news_feed_id=news_feed_id,
+                    youtube_video_id=youtube_video_id,
                     raw_response=json.dumps({
                         'uri': post_uri,
                         'cid': post_cid
