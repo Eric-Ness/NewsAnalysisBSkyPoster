@@ -164,7 +164,7 @@ YOUTUBE_DB_CONNECTION_STRING = (
 ENABLE_YOUTUBE_POSTING = os.getenv("ENABLE_YOUTUBE_POSTING", "false").lower() in ("true", "1", "yes")
 
 # YouTube Candidate Selection
-YOUTUBE_MAX_CANDIDATES = 100           # Videos to fetch from DB
+YOUTUBE_MAX_CANDIDATES = 250           # Videos to fetch from DB (needs headroom for filtering)
 YOUTUBE_MAX_AGE_DAYS = 3               # Only consider videos from last N days
 YOUTUBE_MIN_VIEWS = 1000               # Minimum view count threshold
 YOUTUBE_MIN_DURATION_SECONDS = 60      # Skip very short videos (under 1 min)
