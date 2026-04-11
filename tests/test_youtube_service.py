@@ -153,6 +153,47 @@ class TestFilterCandidates:
         assert len(result) == 1
         assert result[0].title == "Hurricane Makes Landfall in Florida"
 
+    def test_filters_non_latin_script_titles(self, mock_youtube_service, youtube_video_candidate_factory):
+        """Should filter out videos with non-Latin scripts (Korean, Arabic, Chinese, etc.)."""
+        service, _, _ = mock_youtube_service
+
+        candidates = [
+            youtube_video_candidate_factory(video_id=1, title="속보: 북한 미사일 발사", description="북한이 동해로 미사일을 발사했다"),
+            youtube_video_candidate_factory(video_id=2, video_key="xyz789abc01", title="عاجل: هجوم صاروخي على المنطقة", description="القوات المسلحة ردت على الهجوم"),
+            youtube_video_candidate_factory(video_id=3, video_key="def456ghi78", title="Hurricane Makes Landfall in Florida", description="A major hurricane hit the coast today"),
+        ]
+
+        with patch.object(type(service), '_get_posted_urls', return_value=[]):
+            with patch('services.youtube_service.settings') as mock_settings:
+                mock_settings.YOUTUBE_MIN_DURATION_SECONDS = 60
+                mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
+                mock_settings.YOUTUBE_BLOCKED_CHANNELS = []
+                mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
+                result = service.filter_candidates(candidates)
+
+        assert len(result) == 1
+        assert result[0].title == "Hurricane Makes Landfall in Florida"
+
+    def test_allows_english_with_some_non_latin(self, mock_youtube_service, youtube_video_candidate_factory):
+        """Should allow English titles that contain a few non-Latin characters (e.g., accented names)."""
+        service, _, _ = mock_youtube_service
+
+        candidates = [
+            youtube_video_candidate_factory(video_id=1, title="Iran's Président addresses UN assembly", description="Full coverage of today's session"),
+        ]
+
+        with patch.object(type(service), '_get_posted_urls', return_value=[]):
+            with patch('services.youtube_service.settings') as mock_settings:
+                mock_settings.YOUTUBE_MIN_DURATION_SECONDS = 60
+                mock_settings.YOUTUBE_MAX_DURATION_SECONDS = 360
+                mock_settings.YOUTUBE_BLOCKED_CHANNELS = []
+                mock_settings.YOUTUBE_OPINION_TITLE_PATTERNS = []
+                mock_settings.YOUTUBE_MAX_PER_CHANNEL = 3
+                result = service.filter_candidates(candidates)
+
+        assert len(result) == 1
+
     def test_caps_per_channel_diversity(self, mock_youtube_service, youtube_video_candidate_factory):
         """Should cap videos per channel to ensure source diversity."""
         service, _, _ = mock_youtube_service

@@ -131,6 +131,11 @@ class YouTubeVideoService:
                 logger.debug(f"Skipping already posted URL: {video.url}")
                 continue
 
+            # Skip non-English content (title or description with non-Latin characters)
+            if not self._is_likely_english(video.title, video.description):
+                logger.debug(f"Skipping non-English video: {video.title}")
+                continue
+
             # Skip opinion/commentary content (principle-based, channel-agnostic)
             if self._is_opinion_title(video.title, opinion_patterns):
                 logger.debug(f"Skipping opinion/commentary title: {video.title}")
@@ -150,6 +155,23 @@ class YouTubeVideoService:
             logger.info(f"Filtered out {removed} videos (duration/blocked/history/editorial/diversity), {len(filtered)} remaining")
 
         return filtered
+
+    @staticmethod
+    def _is_likely_english(title: str, description: str) -> bool:
+        """Check if title and description are likely English by measuring Latin character ratio.
+
+        Non-Latin scripts (Korean, Arabic, Chinese, Cyrillic, etc.) will have a low
+        ratio of basic Latin characters, making this a reliable language-agnostic filter.
+        """
+        for text in [title, description]:
+            if not text or len(text.strip()) < 10:
+                continue
+            # Count characters that are basic Latin letters (a-z, A-Z)
+            latin_chars = sum(1 for c in text if c.isascii() and c.isalpha())
+            total_alpha = sum(1 for c in text if c.isalpha())
+            if total_alpha > 0 and (latin_chars / total_alpha) < 0.7:
+                return False
+        return True
 
     @staticmethod
     def _is_opinion_title(title: str, patterns: List[str]) -> bool:
