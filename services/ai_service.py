@@ -447,9 +447,10 @@ Candidates (format: [Sources: count] Title (URL)):
                 f"- {post.title}" for post in recent_posts if post.title
             ])
 
-            # Format candidates with engagement metrics
+            # Format candidates with engagement metrics and source tier
             candidate_entries = "\n".join([
-                f"- [Views: {format_count(item.get('View_Count', 0))} | "
+                f"- [Tier {item.get('Tier', 2)}] "
+                f"[Views: {format_count(item.get('View_Count', 0))} | "
                 f"Likes: {format_count(item.get('Like_Count', 0))} | "
                 f"Comments: {format_count(item.get('Comment_Count', 0))} | "
                 f"{format_duration(item.get('Duration_Seconds', 0))}] "
@@ -466,12 +467,13 @@ EDITORIAL STANDARD:
 - Duration sweet spot: 1-5 minute focused reports are ideal; long panel discussions or full shows are not
 
 SELECTION CRITERIA (in priority order):
-1. NEWSWORTHINESS: Breaking news, major developments, or stories with real-world consequences
-2. STRAIGHT NEWS: Factual reporting with clear who/what/where/when — not opinion, analysis shows, or commentary
-3. ENGLISH LANGUAGE: Only select videos that are clearly in English (English title, English-language channel)
-4. ENGAGEMENT: Higher view counts and likes suggest broader public interest
-5. DIVERSITY: Cover different topics — do not select multiple videos about the same event
-6. RECENCY: Prefer more recent videos when newsworthiness is comparable
+1. SOURCE QUALITY: Strongly prefer Tier 1 (wire services, public broadcasters) and Tier 2 (major mainstream). Tier 3 sources are opinion-heavy — pick them only for truly breaking news that Tier 1/2 sources haven't covered.
+2. NEWSWORTHINESS: Breaking news, major developments, or stories with real-world consequences
+3. STRAIGHT NEWS: Factual reporting with clear who/what/where/when — not opinion, analysis shows, or commentary
+4. ENGLISH LANGUAGE: Only select videos that are clearly in English (English title, English-language channel)
+5. ENGAGEMENT: Higher view counts and likes suggest broader public interest
+6. DIVERSITY: Cover different topics — do not select multiple videos about the same event
+7. RECENCY: Prefer more recent videos when newsworthiness is comparable
 
 MUST AVOID:
 - Opinion, commentary, editorial, or analysis programs (even from reputable channels)

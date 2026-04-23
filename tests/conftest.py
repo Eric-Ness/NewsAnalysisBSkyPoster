@@ -822,6 +822,7 @@ def youtube_video_candidate_factory():
         comment_count: int = 200,
         channel_name: str = "CNN",
         channel_handle: str = "@CNN",
+        tier: int = 2,
         **kwargs
     ) -> YouTubeVideoCandidate:
         if published_date is None:
@@ -842,6 +843,7 @@ def youtube_video_candidate_factory():
             comment_count=comment_count,
             channel_name=channel_name,
             channel_handle=channel_handle,
+            tier=tier,
         )
 
     return _create_candidate

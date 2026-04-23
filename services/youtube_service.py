@@ -66,7 +66,10 @@ class YouTubeVideoService:
             return []
 
         candidates = []
+        unknown_channels_this_run: set = set()
         for _, row in df.iterrows():
+            handle = row.get('Channel_Handle')
+            tier = self._resolve_channel_tier(handle, unknown_channels_this_run)
             candidates.append(YouTubeVideoCandidate(
                 youtube_video_id=row['YouTube_Video_ID'],
                 youtube_video_key=row['YouTube_Video_Key'],
@@ -79,11 +82,34 @@ class YouTubeVideoService:
                 like_count=row.get('Like_Count', 0) or 0,
                 comment_count=row.get('Comment_Count', 0) or 0,
                 channel_name=row.get('Channel_Name'),
-                channel_handle=row.get('Channel_Handle'),
+                channel_handle=handle,
+                tier=tier,
             ))
 
         logger.info(f"Fetched {len(candidates)} YouTube video candidates from database")
         return candidates
+
+    @staticmethod
+    def _resolve_channel_tier(handle: Optional[str], unknown_seen: Optional[set] = None) -> int:
+        """Look up a channel's tier from settings.YOUTUBE_CHANNEL_TIERS.
+
+        Falls back to YOUTUBE_DEFAULT_TIER for unknown channels. Emits a single
+        WARNING per unknown handle per run (via the unknown_seen set) so the log
+        isn't spammy but new channels are still surfaced for classification.
+        """
+        if not handle:
+            return settings.YOUTUBE_DEFAULT_TIER
+        key = handle.lower()
+        tier = settings.YOUTUBE_CHANNEL_TIERS.get(key)
+        if tier is not None:
+            return tier
+        if unknown_seen is not None and key not in unknown_seen:
+            unknown_seen.add(key)
+            logger.warning(
+                f"Unknown channel {handle} — defaulted to Tier {settings.YOUTUBE_DEFAULT_TIER}. "
+                f"Add to YOUTUBE_CHANNEL_TIERS in config/settings.py to classify."
+            )
+        return settings.YOUTUBE_DEFAULT_TIER
 
     def filter_candidates(self, candidates: List[YouTubeVideoCandidate]) -> List[YouTubeVideoCandidate]:
         """
@@ -92,10 +118,10 @@ class YouTubeVideoService:
         Filters:
         - Skip videos under YOUTUBE_MIN_DURATION_SECONDS
         - Skip videos over YOUTUBE_MAX_DURATION_SECONDS (prefer single news items)
-        - Skip blocked channels (YOUTUBE_BLOCKED_CHANNELS)
+        - Skip Tier 4 channels (state propaganda / unreliable per YOUTUBE_CHANNEL_TIERS)
         - Skip videos whose URL is already in URL history
         - Skip opinion/commentary titles (principle-based editorial filter)
-        - Cap per-channel representation (YOUTUBE_MAX_PER_CHANNEL) for source diversity
+        - Cap per-channel representation via YOUTUBE_TIER_CAPS for source diversity + quality
 
         Args:
             candidates: List of video candidates to filter.
@@ -104,9 +130,8 @@ class YouTubeVideoService:
             List[YouTubeVideoCandidate]: Filtered list of candidates.
         """
         posted_urls = self._get_posted_urls()
-        blocked_channels = [h.lower() for h in settings.YOUTUBE_BLOCKED_CHANNELS]
         opinion_patterns = settings.YOUTUBE_OPINION_TITLE_PATTERNS
-        max_per_channel = settings.YOUTUBE_MAX_PER_CHANNEL
+        tier_caps = settings.YOUTUBE_TIER_CAPS
         channel_counts: dict = {}
         filtered = []
 
@@ -121,9 +146,9 @@ class YouTubeVideoService:
                 logger.debug(f"Skipping long video ({video.duration_seconds}s): {video.title}")
                 continue
 
-            # Skip blocked channels
-            if video.channel_handle and video.channel_handle.lower() in blocked_channels:
-                logger.debug(f"Skipping blocked channel {video.channel_handle}: {video.title}")
+            # Skip Tier 4 (blocked) channels
+            if video.tier == 4:
+                logger.debug(f"Skipping Tier 4 channel {video.channel_handle}: {video.title}")
                 continue
 
             # Skip already posted URLs
@@ -141,18 +166,29 @@ class YouTubeVideoService:
                 logger.debug(f"Skipping opinion/commentary title: {video.title}")
                 continue
 
-            # Enforce per-channel diversity cap
+            # Enforce per-tier channel cap
             channel_key = (video.channel_handle or video.channel_name or 'unknown').lower()
             channel_counts[channel_key] = channel_counts.get(channel_key, 0) + 1
-            if channel_counts[channel_key] > max_per_channel:
-                logger.debug(f"Channel cap reached ({max_per_channel}) for {channel_key}: {video.title}")
+            cap = tier_caps.get(video.tier, tier_caps.get(settings.YOUTUBE_DEFAULT_TIER, 3))
+            if channel_counts[channel_key] > cap:
+                logger.debug(
+                    f"Tier {video.tier} cap reached ({cap}) for {channel_key}: {video.title}"
+                )
                 continue
 
             filtered.append(video)
 
         removed = len(candidates) - len(filtered)
         if removed > 0:
-            logger.info(f"Filtered out {removed} videos (duration/blocked/history/editorial/diversity), {len(filtered)} remaining")
+            logger.info(f"Filtered out {removed} videos (duration/tier/history/editorial/diversity), {len(filtered)} remaining")
+
+        # Log tier distribution of the remaining pool for observability
+        if filtered:
+            tier_dist: dict = {}
+            for v in filtered:
+                tier_dist[v.tier] = tier_dist.get(v.tier, 0) + 1
+            dist_str = ", ".join(f"T{t}={c}" for t, c in sorted(tier_dist.items()))
+            logger.info(f"Candidate pool by tier: {dist_str}")
 
         return filtered
 

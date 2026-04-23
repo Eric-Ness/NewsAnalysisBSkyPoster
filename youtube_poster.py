@@ -110,6 +110,7 @@ class YouTubePoster:
                     'Duration_Seconds': v.duration_seconds,
                     'Channel_Name': v.channel_name,
                     'Channel_Handle': v.channel_handle,
+                    'Tier': v.tier,
                     'url': v.url,
                     'thumbnail_url': v.thumbnail_url,
                     'youtube_video_key': v.youtube_video_key,

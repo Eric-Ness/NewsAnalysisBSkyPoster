@@ -28,6 +28,7 @@ class YouTubeVideoCandidate:
     comment_count: int = 0
     channel_name: Optional[str] = None
     channel_handle: Optional[str] = None
+    tier: int = 2                          # Channel quality tier (populated by service layer)
 
     @property
     def url(self) -> str:

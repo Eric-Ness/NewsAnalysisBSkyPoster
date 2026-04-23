@@ -169,15 +169,78 @@ YOUTUBE_MAX_AGE_DAYS = 3               # Only consider videos from last N days
 YOUTUBE_MIN_VIEWS = 1000               # Minimum view count threshold
 YOUTUBE_MIN_DURATION_SECONDS = 60      # Skip very short videos (under 1 min)
 YOUTUBE_MAX_DURATION_SECONDS = 360     # Skip long show segments (over 6 min)
-YOUTUBE_MAX_PER_CHANNEL = 3            # Max videos per channel in candidate pool (ensures diversity)
 YOUTUBE_CANDIDATE_SELECTION_LIMIT = 50 # Pool size for AI selection
 
 # YouTube Posting Limits
 YOUTUBE_MAX_POSTS_PER_RUN = 1          # Maximum videos to post per run
 YOUTUBE_MAX_RETRIES = 15               # Max video candidates to try before giving up
 
-# YouTube Channel Blocklist (channel handles to skip)
-YOUTUBE_BLOCKED_CHANNELS: list = []
+# YouTube Channel Quality Tiers
+# Lower tier = higher preference. Unknown channels default to YOUTUBE_DEFAULT_TIER.
+#   Tier 1: Wire services & hard-news public broadcasters (AP, Reuters, BBC News, C-SPAN, PBS, NPR, AFP)
+#   Tier 2: Major mainstream commercial news (NBC, ABC, CBS, CNN, Al Jazeera EN, Bloomberg, etc.)
+#   Tier 3: Opinion-heavy cable/commentary (Fox News, MSNBC, Sky News Australia) — capped hard
+#   Tier 4: Blocked (state propaganda, consistently unreliable per Wikipedia Perennial Sources)
+YOUTUBE_CHANNEL_TIERS: dict = {
+    # Tier 1 — Wire services & hard-news public broadcasters
+    '@reuters': 1,
+    '@associatedpress': 1,
+    '@afp': 1,
+    '@bbcnews': 1,
+    '@pbsnewshour': 1,
+    '@npr': 1,
+    '@cspan': 1,
+
+    # Tier 2 — Major mainstream, generally straight news
+    '@nbcnews': 2,
+    '@abcnews': 2,
+    '@cbsnews': 2,
+    '@cnn': 2,
+    '@cbsmornings': 2,
+    '@abc7': 2,
+    '@bloombergtv': 2,
+    '@wsj': 2,
+    '@nytimes': 2,
+    '@theeconomist': 2,
+    '@aljazeeraenglish': 2,
+    '@cbcnews': 2,
+    '@cbcthenational': 2,
+    '@globalnews': 2,
+    '@skynews': 2,
+    '@itvnews': 2,
+    '@dwnews': 2,
+    '@tagesschau': 2,
+    '@france24': 2,
+    '@euronews': 2,
+    '@telemundonoticias': 2,
+    '@aristeguinoticias': 2,
+
+    # Tier 3 — Opinion-heavy cable/commentary (hard-capped to 1 per pool)
+    '@foxnews': 3,
+    '@foxbusiness': 3,
+    '@msnbc': 3,
+    '@skynewsaustralia': 3,
+
+    # Tier 4 — Blocked (state-affiliated propaganda or deprecated-unreliable)
+    '@trtworld': 4,
+    '@rt': 4,
+    '@sputnik': 4,
+    '@cgtn': 4,
+    '@presstv': 4,
+    '@newsmax': 4,
+    '@oann': 4,
+}
+
+YOUTUBE_DEFAULT_TIER: int = 2   # Default tier for channels not in YOUTUBE_CHANNEL_TIERS
+
+# Per-tier caps on videos per channel in the AI's candidate pool.
+# Replaces the former flat YOUTUBE_MAX_PER_CHANNEL. Tier 4 is filtered before this applies.
+YOUTUBE_TIER_CAPS: dict = {
+    1: 5,   # Wire/public can dominate the pool
+    2: 3,   # Mainstream retains the previous flat cap
+    3: 1,   # Opinion-heavy hard-limited to one per pool
+    4: 0,   # Never reached — T4 filtered earlier
+}
 
 # YouTube Editorial Filters (principle-based, channel-agnostic)
 # Title patterns that indicate opinion/commentary rather than straight news reporting
