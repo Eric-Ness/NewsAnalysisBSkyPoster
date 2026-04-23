@@ -68,10 +68,10 @@ DEFAULT_PLATFORMS = _enabled_platforms if _enabled_platforms else ["bluesky"]  #
 
 # AI Model Settings
 DEFAULT_AI_MODELS = [
-    'gemini-2.0-flash',  # Good balance of capability and cost
-    'gemini-2.0-flash-lite',      # If available, even more cost-effective
-    'gemini-2.5-flash-lite',    # Fallback to older model
-    'gemini-2.5-flash'
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash'
 ]
 
 # =============================================================================
