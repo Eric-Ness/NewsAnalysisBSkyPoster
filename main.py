@@ -18,6 +18,10 @@ from datetime import date
 from typing import Optional, List, Dict, Any
 from urllib.parse import urlparse
 
+# Apply HTTP transport patch BEFORE importing anything that imports atproto.
+# BlueSky's WAF blocks Python's TLS fingerprint; this swaps in curl_cffi.
+import utils.atproto_transport  # noqa: F401
+
 from config import settings
 from utils.logger import get_logger, setup_file_logging
 from utils.exceptions import (

@@ -14,6 +14,7 @@ webdriver-manager>=4.0.0
 
 # Social media APIs
 atproto>=0.0.31
+curl_cffi>=0.15.0  # Browser-fingerprint TLS for atproto to bypass BlueSky WAF block
 tweepy>=4.14.0  # Twitter API client
 
 # Utilities
