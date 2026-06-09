@@ -200,4 +200,16 @@ PR_TITLE_PATTERNS = [
     r"investor\s+(update|call|presentation)",   # "Investor Update"
     r"^notice\s+of\s+",                         # "Notice of AGM"
     r"shareholder\s+(meeting|letter|update)",   # "Shareholder Meeting"
+
+    # Video game industry PR (announcements, launches, DLC drops, vendor showcases)
+    r"\b(game|battle|season)\s+pass\b",                                                          # "Season Pass 2"
+    r"\b(xbox|playstation|nintendo)\s+games?\s+showcase\b",                                      # "Xbox Games Showcase"
+    r"\bnew\s+dlc\b|\bdlc\s+(pack|drop|content)\b",                                              # "New DLC", "DLC pack"
+    r"\b(expansion|content)\s+pack\b",                                                           # "Expansion pack"
+    r"\b(announced|confirmed|coming|comes|debuts?)\s+(for|to|on)\s+(ps[45]|xbox|nintendo\s+switch|switch\s*2|steam|pc)\b",  # "Confirmed for Nintendo Switch 2"
+    r"\b(switch\s*2|ps5|ps4|xbox\s+series\s+[xs])\s+(version|edition|port)\b",                   # "Switch 2 Edition"
+    r"\bgameplay\s+(reveal|trailer|footage|preview)\b",                                          # "Gameplay trailer"
+    r"\b(launch|release)\s+(trailer|window|date)\b",                                             # "Launch trailer"
+    r"\blaunches?\s+(in|on)\s+\d{4}\b",                                                          # "Launches in 2027" — also catches generic product launches (PR)
+    r"^rumor[:\s]",                                                                              # "Rumor: ..."
 ]

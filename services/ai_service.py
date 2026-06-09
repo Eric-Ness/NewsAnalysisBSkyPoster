@@ -303,6 +303,7 @@ SELECTION CRITERIA (in priority order):
 MUST AVOID:
 - Corporate press releases, product announcements, or company earnings reports (these are PR, not news)
 - Stories that are essentially advertisements for a company's products, services, or achievements
+- Video game launches, platform reveals (PS5/Xbox/Switch 2 versions), DLC or season-pass drops, vendor showcases (Xbox Games Showcase, etc.), or gameplay trailers — these are PR-shaped industry coverage, not news
 - Celebrity gossip, sports scores, or entertainment news (unless major cultural impact)
 - Financial product promotions (loans, mortgages, credit cards)
 - Sales events or deal roundups (unless truly newsworthy like major economic events)
