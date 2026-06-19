@@ -70,9 +70,15 @@ DEFAULT_PLATFORMS = _enabled_platforms if _enabled_platforms else ["bluesky"]  #
 DEFAULT_AI_MODELS = [
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-2.0-flash'
+    # Note: gemini-2.0-flash{,-lite} returned 404 from the Generative Language API
+    # as of 2026-06-18 (Google deprecated them). Pruned from the fallback chain.
 ]
+
+# Arli AI fallback (OpenAI-compatible API, used only when all Gemini models fail)
+ARLI_API_KEY = os.getenv("ARLI_API_KEY", "")
+ARLI_BASE_URL = os.getenv("ARLI_BASE_URL", "https://api.arliai.com/v1")
+ARLI_MODEL = os.getenv("ARLI_MODEL", "Qwen3.5-27B-Derestricted")
+ARLI_MAX_TOKENS = 2500   # Qwen3 uses generous reasoning tokens before answering
 
 # =============================================================================
 # Content Processing Settings

@@ -254,6 +254,9 @@ class TestCandidateSelectionIntegration:
 
             from services.ai_service import AIService
             service = AIService()
+            # Disable the Arli fallback so tests never make live API calls.
+            # Tests that want to exercise the Arli path can re-enable explicitly.
+            service._arli_client = None
             yield service, mock_client, mock_response
 
     def test_high_source_count_articles_included_in_candidates(self, mock_ai_service):
@@ -363,6 +366,9 @@ class TestSimilarityCheck:
 
             from services.ai_service import AIService
             service = AIService()
+            # Disable the Arli fallback so tests never make live API calls.
+            # Tests that want to exercise the Arli path can re-enable explicitly.
+            service._arli_client = None
             yield service, mock_client, mock_response
 
     def test_similarity_check_similar(self, mock_ai_service):
@@ -464,6 +470,9 @@ class TestTweetGeneration:
 
             from services.ai_service import AIService
             service = AIService()
+            # Disable the Arli fallback so tests never make live API calls.
+            # Tests that want to exercise the Arli path can re-enable explicitly.
+            service._arli_client = None
             yield service, mock_client, mock_response
 
     def test_generate_tweet_structured(self, mock_ai_service):
@@ -516,7 +525,7 @@ class TestTweetGeneration:
         assert '##' not in result['tweet_text']
 
     def test_generate_tweet_none_response(self, mock_ai_service):
-        """Verify that None parsed response returns None (not crash)."""
+        """Verify that when every provider fails (Gemini empty + no Arli) the method returns None."""
         service, mock_client, mock_response = mock_ai_service
 
         mock_response.parsed = None
