@@ -80,6 +80,12 @@ ARLI_BASE_URL = os.getenv("ARLI_BASE_URL", "https://api.arliai.com/v1")
 ARLI_MODEL = os.getenv("ARLI_MODEL", "Qwen3.5-27B-Derestricted")
 ARLI_MAX_TOKENS = 2500   # Qwen3 uses generous reasoning tokens before answering
 
+# Primary AI provider — picks which provider the fallback chain starts with.
+# "gemini" (default): chain is [gemini-2.5-flash-lite, gemini-2.5-flash, arli]
+# "arli":             chain is [arli, gemini-2.5-flash-lite, gemini-2.5-flash]
+# Anything else falls back to "gemini" with a warning logged at init.
+AI_PRIMARY_PROVIDER = os.getenv("AI_PRIMARY_PROVIDER", "gemini").lower()
+
 # =============================================================================
 # Content Processing Settings
 # =============================================================================

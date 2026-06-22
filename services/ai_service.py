@@ -25,6 +25,11 @@ from utils.helpers import is_domain_match, extract_base_domain
 
 logger = get_logger(__name__)
 
+# Sentinel returned by per-provider attempt helpers to mean "this attempt failed,
+# try the next provider". A unique object so it can't be confused with any
+# legitimate return value (including None, False, empty list, etc.).
+_NO_RESULT = object()
+
 @dataclass
 class FeedPost:
     """Data class to store AT Protocol feed post content."""
@@ -121,7 +126,7 @@ class AIService:
             logger.error(f"Error initializing Gemini AI: {e}")
             raise AIServiceError(f"Failed to initialize AI service: {e}") from e
 
-        # Optional Arli AI (OpenAI-compatible) fallback provider — only used if all Gemini models fail
+        # Optional Arli AI (OpenAI-compatible) fallback provider
         self._arli_client: Optional[Any] = None
         self._arli_model: Optional[str] = None
         if settings.ARLI_API_KEY:
@@ -137,38 +142,73 @@ class AIService:
                 logger.warning(f"Failed to configure Arli AI fallback (continuing without it): {e}")
                 self._arli_client = None
 
+        # Resolve primary provider — controls the order of the fallback chain.
+        # Valid values: "gemini" (default), "arli". Unknown values fall back to "gemini".
+        primary = settings.AI_PRIMARY_PROVIDER
+        if primary not in ("gemini", "arli"):
+            logger.warning(
+                f"Unknown AI_PRIMARY_PROVIDER={primary!r}, defaulting to 'gemini'. "
+                "Valid values: 'gemini', 'arli'."
+            )
+            primary = "gemini"
+        self._primary_provider = primary
+        logger.info(f"AI primary provider: {self._primary_provider}")
+
     def _try_with_fallback(
         self,
         operation_label: str,
         gemini_fn: Callable[[str], Any],
         arli_fn: Optional[Callable[[], Any]] = None,
     ) -> Any:
-        """Try each Gemini model in order; on exhaustion, try Arli if configured.
+        """Try each provider in the configured fallback chain. Ordering depends on
+        AI_PRIMARY_PROVIDER: when "arli", Arli runs first then Gemini models; when
+        "gemini" (default), Gemini models run first then Arli.
 
         Raises the last exception if all providers fail.
         """
         last_exc: Optional[Exception] = None
-        for model_name in self._gemini_models:
+
+        def _try_arli() -> Any:
+            nonlocal last_exc
+            if not (arli_fn and self._arli_client):
+                return _NO_RESULT
             try:
-                return gemini_fn(model_name)
-            except Exception as e:
-                last_exc = e
-                logger.warning(
-                    f"{operation_label}: Gemini {model_name} failed "
-                    f"({type(e).__name__}: {str(e)[:140]})"
-                )
-        if arli_fn and self._arli_client:
-            try:
-                logger.info(f"{operation_label}: falling back to Arli AI")
+                logger.info(f"{operation_label}: trying Arli AI")
                 result = arli_fn()
                 logger.info(f"{operation_label}: succeeded via Arli AI")
                 return result
             except Exception as e:
                 last_exc = e
-                logger.error(
-                    f"{operation_label}: Arli AI also failed "
+                logger.warning(
+                    f"{operation_label}: Arli AI failed "
                     f"({type(e).__name__}: {str(e)[:140]})"
                 )
+                return _NO_RESULT
+
+        def _try_gemini_chain() -> Any:
+            nonlocal last_exc
+            for model_name in self._gemini_models:
+                try:
+                    return gemini_fn(model_name)
+                except Exception as e:
+                    last_exc = e
+                    logger.warning(
+                        f"{operation_label}: Gemini {model_name} failed "
+                        f"({type(e).__name__}: {str(e)[:140]})"
+                    )
+            return _NO_RESULT
+
+        # Order the chain based on the configured primary provider
+        if self._primary_provider == "arli":
+            attempts = (_try_arli, _try_gemini_chain)
+        else:
+            attempts = (_try_gemini_chain, _try_arli)
+
+        for attempt in attempts:
+            result = attempt()
+            if result is not _NO_RESULT:
+                return result
+
         if last_exc:
             raise last_exc
         raise AIServiceError(f"{operation_label}: no providers available")
