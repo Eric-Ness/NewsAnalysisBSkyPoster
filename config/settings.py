@@ -78,7 +78,9 @@ DEFAULT_AI_MODELS = [
 ARLI_API_KEY = os.getenv("ARLI_API_KEY", "")
 ARLI_BASE_URL = os.getenv("ARLI_BASE_URL", "https://api.arliai.com/v1")
 ARLI_MODEL = os.getenv("ARLI_MODEL", "Qwen3.5-27B-Derestricted")
-ARLI_MAX_TOKENS = 2500   # Qwen3 uses generous reasoning tokens before answering
+ARLI_MAX_TOKENS = 5000   # Headroom for non-thinking models (e.g. Mistral) to emit
+                         # large structured outputs like 15-item article selection JSON
+                         # without truncating mid-string.
 
 # Primary AI provider — picks which provider the fallback chain starts with.
 # "gemini" (default): chain is [gemini-2.5-flash-lite, gemini-2.5-flash, arli]
