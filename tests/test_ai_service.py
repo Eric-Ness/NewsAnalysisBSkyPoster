@@ -539,6 +539,90 @@ class TestTweetGeneration:
         assert result is None
 
 
+class TestFallbackOrdering:
+    """Tests for _try_with_fallback chain ordering, including the force_gemini_first
+    override used by call sites where Arli is known to perform poorly."""
+
+    def _build_service(self, primary: str):
+        """Construct an AIService with mocked Gemini + Arli, and primary provider set."""
+        with patch('services.ai_service.genai') as mock_genai:
+            mock_client = MagicMock()
+            mock_genai.Client.return_value = mock_client
+            mock_model = MagicMock()
+            mock_model.name = 'models/gemini-2.0-flash'
+            mock_client.models.list.return_value = [mock_model]
+            mock_client.models.generate_content.return_value = MagicMock()
+            with patch('services.ai_service.settings') as mock_settings:
+                mock_settings.GOOGLE_AI_API_KEY = 'fake'
+                mock_settings.DEFAULT_AI_MODELS = ['gemini-2.0-flash']
+                mock_settings.ARLI_API_KEY = 'fake-arli-key'
+                mock_settings.ARLI_BASE_URL = 'https://example.com'
+                mock_settings.ARLI_MODEL = 'fake-model'
+                mock_settings.AI_PRIMARY_PROVIDER = primary
+                from services.ai_service import AIService
+                service = AIService()
+                # Pretend Arli is wired up — the test doesn't actually hit it
+                service._arli_client = MagicMock()
+                return service
+
+    def test_primary_arli_calls_arli_first(self):
+        """With AI_PRIMARY_PROVIDER=arli, default fallback chain tries Arli first."""
+        service = self._build_service(primary="arli")
+        call_order = []
+        service._try_with_fallback(
+            "test op",
+            gemini_fn=lambda m: call_order.append(f"gemini:{m}") or "gemini-result",
+            arli_fn=lambda: call_order.append("arli") or "arli-result",
+        )
+        assert call_order[0] == "arli", f"Expected arli first, got {call_order!r}"
+
+    def test_primary_arli_with_force_gemini_first_calls_gemini_first(self):
+        """force_gemini_first=True overrides AI_PRIMARY_PROVIDER=arli and runs Gemini first."""
+        service = self._build_service(primary="arli")
+        call_order = []
+        service._try_with_fallback(
+            "test op",
+            gemini_fn=lambda m: call_order.append(f"gemini:{m}") or "gemini-result",
+            arli_fn=lambda: call_order.append("arli") or "arli-result",
+            force_gemini_first=True,
+        )
+        assert call_order[0].startswith("gemini:"), (
+            f"Expected gemini first when force_gemini_first=True, got {call_order!r}"
+        )
+        # Arli should not have been called at all since Gemini succeeded
+        assert "arli" not in call_order
+
+    def test_primary_gemini_calls_gemini_first(self):
+        """With AI_PRIMARY_PROVIDER=gemini, default fallback chain tries Gemini first (sanity check)."""
+        service = self._build_service(primary="gemini")
+        call_order = []
+        service._try_with_fallback(
+            "test op",
+            gemini_fn=lambda m: call_order.append(f"gemini:{m}") or "gemini-result",
+            arli_fn=lambda: call_order.append("arli") or "arli-result",
+        )
+        assert call_order[0].startswith("gemini:")
+
+    def test_force_gemini_first_still_falls_back_to_arli_on_gemini_failure(self):
+        """Even with force_gemini_first=True, Arli is the final safety net if Gemini fails."""
+        service = self._build_service(primary="arli")
+        call_order = []
+
+        def failing_gemini(m):
+            call_order.append(f"gemini:{m}")
+            raise RuntimeError("gemini down")
+
+        service._try_with_fallback(
+            "test op",
+            gemini_fn=failing_gemini,
+            arli_fn=lambda: call_order.append("arli") or "arli-result",
+            force_gemini_first=True,
+        )
+        # Gemini tried first, failed, then Arli was tried as safety net
+        assert call_order[0].startswith("gemini:")
+        assert "arli" in call_order
+
+
 class TestPydanticModels:
     """Tests for the Pydantic model definitions used in structured output."""
 

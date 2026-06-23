@@ -159,10 +159,16 @@ class AIService:
         operation_label: str,
         gemini_fn: Callable[[str], Any],
         arli_fn: Optional[Callable[[], Any]] = None,
+        force_gemini_first: bool = False,
     ) -> Any:
         """Try each provider in the configured fallback chain. Ordering depends on
         AI_PRIMARY_PROVIDER: when "arli", Arli runs first then Gemini models; when
         "gemini" (default), Gemini models run first then Arli.
+
+        If force_gemini_first is True, the Gemini chain runs first regardless of the
+        AI_PRIMARY_PROVIDER setting (Arli still acts as the final safety net). Use this
+        for call sites where Arli is known to perform poorly — for example, article
+        selection, where the large structured output reliably truncates on Mistral.
 
         Raises the last exception if all providers fail.
         """
@@ -198,8 +204,9 @@ class AIService:
                     )
             return _NO_RESULT
 
-        # Order the chain based on the configured primary provider
-        if self._primary_provider == "arli":
+        # Order the chain based on the configured primary provider, unless the call
+        # site has explicitly requested Gemini-first (force_gemini_first=True).
+        if not force_gemini_first and self._primary_provider == "arli":
             attempts = (_try_arli, _try_gemini_chain)
         else:
             attempts = (_try_gemini_chain, _try_arli)
@@ -455,7 +462,12 @@ Candidates (format: [Sources: count] Title (URL)):
                         ]
                     )
 
-                parsed_articles = self._try_with_fallback("AI article selection", _gemini_call, _arli_call)
+                # Article selection has a large structured output (~30 URL+title pairs)
+                # that Mistral truncates reliably. Pin to Gemini-first regardless of
+                # AI_PRIMARY_PROVIDER; Arli is still tried as a final safety net.
+                parsed_articles = self._try_with_fallback(
+                    "AI article selection", _gemini_call, _arli_call, force_gemini_first=True
+                )
 
                 # Extract ranked articles from structured response
                 selected_articles = []
@@ -640,7 +652,11 @@ Candidate videos (format: [engagement metrics] "Title" by Channel (URL)):
                         ]
                     )
 
-                parsed_videos = self._try_with_fallback("AI YouTube video selection", _gemini_call, _arli_call)
+                # Same reasoning as article selection: large structured output
+                # truncates on Mistral, so pin to Gemini-first regardless of primary.
+                parsed_videos = self._try_with_fallback(
+                    "AI YouTube video selection", _gemini_call, _arli_call, force_gemini_first=True
+                )
 
                 selected_videos = []
                 for video in parsed_videos:
