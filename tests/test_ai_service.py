@@ -543,8 +543,12 @@ class TestFallbackOrdering:
     """Tests for _try_with_fallback chain ordering, including the force_gemini_first
     override used by call sites where Arli is known to perform poorly."""
 
-    def _build_service(self, primary: str):
-        """Construct an AIService with mocked Gemini + Arli, and primary provider set."""
+    def _build_service(self, primary: str, max_attempts: int = 2, backoff: float = 0.0):
+        """Construct an AIService with mocked Gemini + Arli, and primary provider set.
+
+        max_attempts/backoff control the new retry behavior. Tests default to backoff=0
+        so they don't actually sleep between simulated 503 retries.
+        """
         with patch('services.ai_service.genai') as mock_genai:
             mock_client = MagicMock()
             mock_genai.Client.return_value = mock_client
@@ -559,6 +563,8 @@ class TestFallbackOrdering:
                 mock_settings.ARLI_BASE_URL = 'https://example.com'
                 mock_settings.ARLI_MODEL = 'fake-model'
                 mock_settings.AI_PRIMARY_PROVIDER = primary
+                mock_settings.GEMINI_MAX_ATTEMPTS_PER_MODEL = max_attempts
+                mock_settings.GEMINI_RETRY_BACKOFF_SEC = backoff
                 from services.ai_service import AIService
                 service = AIService()
                 # Pretend Arli is wired up — the test doesn't actually hit it
@@ -621,6 +627,65 @@ class TestFallbackOrdering:
         # Gemini tried first, failed, then Arli was tried as safety net
         assert call_order[0].startswith("gemini:")
         assert "arli" in call_order
+
+    def test_503_triggers_same_model_retry_before_moving_on(self):
+        """A transient 503 should retry the same Gemini model before falling through."""
+        service = self._build_service(primary="gemini", max_attempts=2, backoff=0.0)
+        attempts = []
+
+        def gemini_call(model_name):
+            attempts.append(model_name)
+            if len(attempts) == 1:
+                raise RuntimeError("503 UNAVAILABLE: model is overloaded")
+            return "success-on-retry"
+
+        result = service._try_with_fallback(
+            "test 503 retry",
+            gemini_fn=gemini_call,
+            arli_fn=lambda: pytest.fail("Arli should not be called when retry succeeds"),
+        )
+        # Should have retried the SAME model and succeeded on the second attempt
+        assert attempts == ['models/gemini-2.0-flash', 'models/gemini-2.0-flash']
+        assert result == "success-on-retry"
+
+    def test_non_transient_error_does_not_retry(self):
+        """Non-503 errors should fall through to the next provider immediately, no retry."""
+        service = self._build_service(primary="gemini", max_attempts=3, backoff=0.0)
+        attempts = []
+
+        def gemini_call(model_name):
+            attempts.append(model_name)
+            raise RuntimeError("Invalid prompt: schema mismatch")
+
+        arli_called = []
+        service._try_with_fallback(
+            "test non-retryable",
+            gemini_fn=gemini_call,
+            arli_fn=lambda: arli_called.append(True) or "arli-result",
+        )
+        # Only ONE Gemini attempt despite max_attempts=3 (non-transient error)
+        assert len(attempts) == 1
+        # Arli still called as the next provider in the chain
+        assert arli_called == [True]
+
+    def test_503_exhausts_attempts_then_falls_through_to_next_provider(self):
+        """If all attempts on a Gemini model 503, fall through to Arli (or next model)."""
+        service = self._build_service(primary="gemini", max_attempts=2, backoff=0.0)
+        attempts = []
+
+        def always_503(model_name):
+            attempts.append(model_name)
+            raise RuntimeError("503 UNAVAILABLE")
+
+        arli_called = []
+        service._try_with_fallback(
+            "test exhaustion",
+            gemini_fn=always_503,
+            arli_fn=lambda: arli_called.append(True) or "arli-result",
+        )
+        # Should have tried Gemini twice (max_attempts=2), then Arli
+        assert len(attempts) == 2
+        assert arli_called == [True]
 
 
 class TestPydanticModels:

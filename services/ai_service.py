@@ -12,6 +12,7 @@ from datetime import datetime
 from enum import Enum
 import json
 import re
+import time
 
 import google.genai as genai
 from google.genai import types
@@ -29,6 +30,18 @@ logger = get_logger(__name__)
 # try the next provider". A unique object so it can't be confused with any
 # legitimate return value (including None, False, empty list, etc.).
 _NO_RESULT = object()
+
+
+def _is_transient_gemini_error(exc: Exception) -> bool:
+    """Return True if the error is worth retrying on the same model.
+
+    503 UNAVAILABLE and 429 RESOURCE_EXHAUSTED are transient capacity/load issues —
+    a short backoff often clears them. Everything else (auth, invalid prompt, model
+    deprecation, parse failure) is not retryable and should move to the next model
+    immediately.
+    """
+    msg = str(exc)
+    return "503" in msg or "UNAVAILABLE" in msg or "429" in msg or "RESOURCE_EXHAUSTED" in msg
 
 @dataclass
 class FeedPost:
@@ -193,15 +206,28 @@ class AIService:
 
         def _try_gemini_chain() -> Any:
             nonlocal last_exc
+            max_attempts = max(1, settings.GEMINI_MAX_ATTEMPTS_PER_MODEL)
             for model_name in self._gemini_models:
-                try:
-                    return gemini_fn(model_name)
-                except Exception as e:
-                    last_exc = e
-                    logger.warning(
-                        f"{operation_label}: Gemini {model_name} failed "
-                        f"({type(e).__name__}: {str(e)[:140]})"
-                    )
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        return gemini_fn(model_name)
+                    except Exception as e:
+                        last_exc = e
+                        is_transient = _is_transient_gemini_error(e)
+                        more_attempts = attempt < max_attempts
+                        if more_attempts and is_transient:
+                            logger.info(
+                                f"{operation_label}: Gemini {model_name} attempt {attempt} "
+                                f"hit transient error, retrying in "
+                                f"{settings.GEMINI_RETRY_BACKOFF_SEC:.1f}s"
+                            )
+                            time.sleep(settings.GEMINI_RETRY_BACKOFF_SEC)
+                            continue
+                        logger.warning(
+                            f"{operation_label}: Gemini {model_name} failed "
+                            f"({type(e).__name__}: {str(e)[:140]})"
+                        )
+                        break  # non-retryable or out of attempts — move to next model
             return _NO_RESULT
 
         # Order the chain based on the configured primary provider, unless the call

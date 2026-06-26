@@ -69,10 +69,20 @@ DEFAULT_PLATFORMS = _enabled_platforms if _enabled_platforms else ["bluesky"]  #
 # AI Model Settings
 DEFAULT_AI_MODELS = [
     'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    # Note: gemini-2.0-flash{,-lite} returned 404 from the Generative Language API
-    # as of 2026-06-18 (Google deprecated them). Pruned from the fallback chain.
+    'gemini-2.5-flash-lite-preview-09-2025',  # Same $0.40/M output as the stable -lite,
+                                              # but different infra — often absorbs 503s
+                                              # when the stable model is under heavy load.
+    # Note: removed 'gemini-2.5-flash' (the $2.50/M output model). Article selection
+    # was 503ing ~50/day on flash-lite, each forcing a retry on flash at 6.25x cost.
+    # With two cheap -lite variants here and Arli as final fallback, we never pay -flash
+    # prices. gemini-2.0-flash{,-lite} are also dead (shut down 2026-06-01).
 ]
+
+# Retry behavior for transient Gemini errors (503 UNAVAILABLE, 429 rate-limit).
+# Each Gemini model in the chain gets up to N attempts before moving to the next model.
+# Non-retryable errors fail through immediately.
+GEMINI_MAX_ATTEMPTS_PER_MODEL = int(os.getenv("GEMINI_MAX_ATTEMPTS_PER_MODEL", "2"))
+GEMINI_RETRY_BACKOFF_SEC = float(os.getenv("GEMINI_RETRY_BACKOFF_SEC", "3.0"))
 
 # Gemini thinking budget. Gemini 2.5 models do internal chain-of-thought reasoning
 # by default; tokens generated during reasoning are billed as output tokens but
