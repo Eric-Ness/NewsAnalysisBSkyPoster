@@ -74,6 +74,15 @@ DEFAULT_AI_MODELS = [
     # as of 2026-06-18 (Google deprecated them). Pruned from the fallback chain.
 ]
 
+# Gemini thinking budget. Gemini 2.5 models do internal chain-of-thought reasoning
+# by default; tokens generated during reasoning are billed as output tokens but
+# never surface in the response. Disabling thinking on the more expensive
+# gemini-2.5-flash fallback cut ~1000+ output tokens per call in benchmarks.
+#   0    -> thinking disabled (recommended default for cost control)
+#   N>0  -> custom token budget for thinking
+#   -1   -> dynamic budget chosen by the model (Google's default behavior)
+GEMINI_THINKING_BUDGET = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
+
 # Arli AI fallback (OpenAI-compatible API, used only when all Gemini models fail)
 ARLI_API_KEY = os.getenv("ARLI_API_KEY", "")
 ARLI_BASE_URL = os.getenv("ARLI_BASE_URL", "https://api.arliai.com/v1")

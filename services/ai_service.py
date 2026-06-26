@@ -220,6 +220,17 @@ class AIService:
             raise last_exc
         raise AIServiceError(f"{operation_label}: no providers available")
 
+    def _gemini_config(self, **kwargs: Any) -> "types.GenerateContentConfig":
+        """Build a GenerateContentConfig with the configured thinking budget applied.
+
+        Centralizes thinking_config so call sites don't have to remember to set it.
+        Settings GEMINI_THINKING_BUDGET=-1 keeps Google's default behavior (full thinking).
+        """
+        budget = settings.GEMINI_THINKING_BUDGET
+        if budget != -1:
+            kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=budget)
+        return types.GenerateContentConfig(**kwargs)
+
     def _arli_chat_json(self, prompt: str, parse_fn: Callable[[Any], Any]) -> Any:
         """Call Arli AI (OpenAI-compatible) requesting JSON output, then apply parse_fn.
 
@@ -301,9 +312,9 @@ Recent Post Titles:
 
             # Multi-provider fallback: try each Gemini model, then Arli AI
             def _gemini_call(model_name: str) -> bool:
-                config = types.GenerateContentConfig(
+                config = self._gemini_config(
                     response_mime_type='text/x.enum',
-                    response_schema=SimilarityResult
+                    response_schema=SimilarityResult,
                 )
                 response = self.client.models.generate_content(
                     model=model_name, contents=prompt, config=config
@@ -441,9 +452,9 @@ Candidates (format: [Sources: count] Title (URL)):
             try:
                 # Multi-provider fallback for article selection
                 def _gemini_call(model_name: str):
-                    config = types.GenerateContentConfig(
+                    config = self._gemini_config(
                         response_mime_type='application/json',
-                        response_schema=list[SelectedArticle]
+                        response_schema=list[SelectedArticle],
                     )
                     response = self.client.models.generate_content(
                         model=model_name, contents=prompt, config=config
@@ -631,9 +642,9 @@ Candidate videos (format: [engagement metrics] "Title" by Channel (URL)):
             try:
                 # Multi-provider fallback for YouTube video selection
                 def _gemini_call(model_name: str):
-                    config = types.GenerateContentConfig(
+                    config = self._gemini_config(
                         response_mime_type='application/json',
-                        response_schema=list[SelectedVideo]
+                        response_schema=list[SelectedVideo],
                     )
                     response = self.client.models.generate_content(
                         model=model_name, contents=prompt, config=config
@@ -737,9 +748,9 @@ Requirements:
 
             # Multi-provider fallback for tweet generation
             def _gemini_call(model_name: str):
-                config = types.GenerateContentConfig(
+                config = self._gemini_config(
                     response_mime_type='application/json',
-                    response_schema=TweetResponse
+                    response_schema=TweetResponse,
                 )
                 response = self.client.models.generate_content(
                     model=model_name, contents=prompt, config=config
