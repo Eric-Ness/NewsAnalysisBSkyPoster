@@ -6,10 +6,11 @@ It provides functionality for content generation, article selection,
 and assessing article similarity.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+import json
 import re
 
 import google.genai as genai
@@ -23,6 +24,11 @@ from utils.exceptions import AIServiceError, TweetGenerationError, ArticleSelect
 from utils.helpers import is_domain_match, extract_base_domain
 
 logger = get_logger(__name__)
+
+# Sentinel returned by per-provider attempt helpers to mean "this attempt failed,
+# try the next provider". A unique object so it can't be confused with any
+# legitimate return value (including None, False, empty list, etc.).
+_NO_RESULT = object()
 
 @dataclass
 class FeedPost:
@@ -91,38 +97,160 @@ class AIService:
         # Create the genai client
         self.client = genai.Client(api_key=api_key)
 
-        # Get available models
+        # Resolve the Gemini fallback chain — every preferred model that's available, in order
         try:
             models_list = self.client.models.list()
             available_models = [m.name for m in models_list]
 
-            # Select a model based on preference order
-            model_name = None
+            gemini_models: List[str] = []
             for preferred in model_preferences:
                 for available in available_models:
-                    if preferred in available:
-                        model_name = available
+                    if preferred in available and available not in gemini_models:
+                        gemini_models.append(available)
                         break
-                if model_name:
-                    break
 
-            if not model_name and len(available_models) > 0:
-                # If none of our preferred models are available, just use the first one
-                model_name = available_models[0]
+            if not gemini_models and available_models:
+                # No preferred models available — fall back to first available so the service still functions
+                gemini_models = [available_models[0]]
 
-            if not model_name:
+            if not gemini_models:
                 raise ValueError("No Gemini models available")
 
-            logger.info(f"Selected AI model: {model_name}")
-
-            # Store the model name for use in generate_content calls
-            self.model_name = model_name
+            self._gemini_models: List[str] = gemini_models
+            self.model_name = gemini_models[0]  # Legacy attribute, kept for backward compatibility
+            logger.info(f"Gemini fallback chain: {gemini_models}")
 
         except AIServiceError:
             raise
         except Exception as e:
             logger.error(f"Error initializing Gemini AI: {e}")
             raise AIServiceError(f"Failed to initialize AI service: {e}") from e
+
+        # Optional Arli AI (OpenAI-compatible) fallback provider
+        self._arli_client: Optional[Any] = None
+        self._arli_model: Optional[str] = None
+        if settings.ARLI_API_KEY:
+            try:
+                from openai import OpenAI
+                self._arli_client = OpenAI(
+                    base_url=settings.ARLI_BASE_URL,
+                    api_key=settings.ARLI_API_KEY,
+                )
+                self._arli_model = settings.ARLI_MODEL
+                logger.info(f"Arli AI fallback configured: {settings.ARLI_MODEL}")
+            except Exception as e:
+                logger.warning(f"Failed to configure Arli AI fallback (continuing without it): {e}")
+                self._arli_client = None
+
+        # Resolve primary provider — controls the order of the fallback chain.
+        # Valid values: "gemini" (default), "arli". Unknown values fall back to "gemini".
+        primary = settings.AI_PRIMARY_PROVIDER
+        if primary not in ("gemini", "arli"):
+            logger.warning(
+                f"Unknown AI_PRIMARY_PROVIDER={primary!r}, defaulting to 'gemini'. "
+                "Valid values: 'gemini', 'arli'."
+            )
+            primary = "gemini"
+        self._primary_provider = primary
+        logger.info(f"AI primary provider: {self._primary_provider}")
+
+    def _try_with_fallback(
+        self,
+        operation_label: str,
+        gemini_fn: Callable[[str], Any],
+        arli_fn: Optional[Callable[[], Any]] = None,
+        force_gemini_first: bool = False,
+    ) -> Any:
+        """Try each provider in the configured fallback chain. Ordering depends on
+        AI_PRIMARY_PROVIDER: when "arli", Arli runs first then Gemini models; when
+        "gemini" (default), Gemini models run first then Arli.
+
+        If force_gemini_first is True, the Gemini chain runs first regardless of the
+        AI_PRIMARY_PROVIDER setting (Arli still acts as the final safety net). Use this
+        for call sites where Arli is known to perform poorly — for example, article
+        selection, where the large structured output reliably truncates on Mistral.
+
+        Raises the last exception if all providers fail.
+        """
+        last_exc: Optional[Exception] = None
+
+        def _try_arli() -> Any:
+            nonlocal last_exc
+            if not (arli_fn and self._arli_client):
+                return _NO_RESULT
+            try:
+                logger.info(f"{operation_label}: trying Arli AI")
+                result = arli_fn()
+                logger.info(f"{operation_label}: succeeded via Arli AI")
+                return result
+            except Exception as e:
+                last_exc = e
+                logger.warning(
+                    f"{operation_label}: Arli AI failed "
+                    f"({type(e).__name__}: {str(e)[:140]})"
+                )
+                return _NO_RESULT
+
+        def _try_gemini_chain() -> Any:
+            nonlocal last_exc
+            for model_name in self._gemini_models:
+                try:
+                    return gemini_fn(model_name)
+                except Exception as e:
+                    last_exc = e
+                    logger.warning(
+                        f"{operation_label}: Gemini {model_name} failed "
+                        f"({type(e).__name__}: {str(e)[:140]})"
+                    )
+            return _NO_RESULT
+
+        # Order the chain based on the configured primary provider, unless the call
+        # site has explicitly requested Gemini-first (force_gemini_first=True).
+        if not force_gemini_first and self._primary_provider == "arli":
+            attempts = (_try_arli, _try_gemini_chain)
+        else:
+            attempts = (_try_gemini_chain, _try_arli)
+
+        for attempt in attempts:
+            result = attempt()
+            if result is not _NO_RESULT:
+                return result
+
+        if last_exc:
+            raise last_exc
+        raise AIServiceError(f"{operation_label}: no providers available")
+
+    def _gemini_config(self, **kwargs: Any) -> "types.GenerateContentConfig":
+        """Build a GenerateContentConfig with the configured thinking budget applied.
+
+        Centralizes thinking_config so call sites don't have to remember to set it.
+        Settings GEMINI_THINKING_BUDGET=-1 keeps Google's default behavior (full thinking).
+        """
+        budget = settings.GEMINI_THINKING_BUDGET
+        if budget != -1:
+            kwargs["thinking_config"] = types.ThinkingConfig(thinking_budget=budget)
+        return types.GenerateContentConfig(**kwargs)
+
+    def _arli_chat_json(self, prompt: str, parse_fn: Callable[[Any], Any]) -> Any:
+        """Call Arli AI (OpenAI-compatible) requesting JSON output, then apply parse_fn.
+
+        Strips any markdown fences the model may emit before json.loads.
+        """
+        assert self._arli_client is not None and self._arli_model is not None
+        resp = self._arli_client.chat.completions.create(
+            model=self._arli_model,
+            messages=[
+                {"role": "system", "content": "Respond with valid JSON only. No markdown fences, no commentary, no prose outside the JSON object."},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=settings.ARLI_MAX_TOKENS,
+        )
+        text = (resp.choices[0].message.content or "").strip()
+        # Strip markdown fences if the model added them despite the system instruction
+        text = re.sub(r'^```(?:json)?\s*|\s*```$', '', text, flags=re.MULTILINE).strip()
+        data = json.loads(text)
+        return parse_fn(data)
     
     def check_content_similarity(self, article_title: str, article_text: str, recent_posts: List[FeedPost]) -> bool:
         """
@@ -182,25 +310,29 @@ Recent Post Titles:
 {recent_content}
 """
 
-            # Add timeout and error handling
-            try:
-                config = types.GenerateContentConfig(
+            # Multi-provider fallback: try each Gemini model, then Arli AI
+            def _gemini_call(model_name: str) -> bool:
+                config = self._gemini_config(
                     response_mime_type='text/x.enum',
-                    response_schema=SimilarityResult
+                    response_schema=SimilarityResult,
                 )
                 response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=config
+                    model=model_name, contents=prompt, config=config
                 )
                 if response.text is None:
-                    logger.warning("AI similarity check returned None response, defaulting to not similar")
-                    return False
-                result = response.text.strip() == "SIMILAR"
+                    raise ValueError("Empty Gemini response for similarity check")
+                return response.text.strip() == "SIMILAR"
+
+            def _arli_call() -> bool:
+                return self._arli_chat_json(
+                    prompt + '\n\nReply with ONLY one of: {"verdict": "SIMILAR"} or {"verdict": "DIFFERENT"}',
+                    lambda d: str(d.get("verdict", "")).strip().upper() == "SIMILAR"
+                )
+
+            try:
+                result = self._try_with_fallback("AI similarity check", _gemini_call, _arli_call)
                 logger.info(f"AI similarity check for '{article_title[:30]}...': {'SIMILAR' if result else 'DIFFERENT'}")
                 return result
-            except AIServiceError:
-                raise
             except Exception as e:
                 logger.error(f"Error in AI similarity check, defaulting to not similar: {e}")
                 return False
@@ -303,6 +435,7 @@ SELECTION CRITERIA (in priority order):
 MUST AVOID:
 - Corporate press releases, product announcements, or company earnings reports (these are PR, not news)
 - Stories that are essentially advertisements for a company's products, services, or achievements
+- Video game launches, platform reveals (PS5/Xbox/Switch 2 versions), DLC or season-pass drops, vendor showcases (Xbox Games Showcase, etc.), or gameplay trailers — these are PR-shaped industry coverage, not news
 - Celebrity gossip, sports scores, or entertainment news (unless major cultural impact)
 - Financial product promotions (loans, mortgages, credit cards)
 - Sales events or deal roundups (unless truly newsworthy like major economic events)
@@ -317,24 +450,38 @@ Candidates (format: [Sources: count] Title (URL)):
 {candidate_titles}"""
 
             try:
-                # Generate content using structured output
-                config = types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                    response_schema=list[SelectedArticle]
-                )
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=config
-                )
+                # Multi-provider fallback for article selection
+                def _gemini_call(model_name: str):
+                    config = self._gemini_config(
+                        response_mime_type='application/json',
+                        response_schema=list[SelectedArticle],
+                    )
+                    response = self.client.models.generate_content(
+                        model=model_name, contents=prompt, config=config
+                    )
+                    if response.parsed is None:
+                        raise ValueError("Empty Gemini parsed response for article selection")
+                    return response.parsed
 
-                if response.parsed is None:
-                    logger.warning("AI article selection returned None parsed response")
-                    raise Exception("Parsed response is None")
+                def _arli_call():
+                    return self._arli_chat_json(
+                        prompt + f'\n\nReply with JSON: {{"selected": [{{"url": "...", "title": "..."}}, ...]}} — choose exactly {max_count} items from the candidates.',
+                        lambda d: [
+                            SelectedArticle(url=str(item.get("url", "")), title=str(item.get("title", "")))
+                            for item in (d.get("selected") or [])
+                            if item.get("url") and item.get("title")
+                        ]
+                    )
+
+                # Article selection has a large structured output (~30 URL+title pairs)
+                # that Mistral truncates reliably. Pin to Gemini-first regardless of
+                # AI_PRIMARY_PROVIDER; Arli is still tried as a final safety net.
+                parsed_articles = self._try_with_fallback(
+                    "AI article selection", _gemini_call, _arli_call, force_gemini_first=True
+                )
 
                 # Extract ranked articles from structured response
                 selected_articles = []
-                parsed_articles = response.parsed
                 for article in parsed_articles:
                     url = article.url.strip()
                     title = article.title.strip()
@@ -351,7 +498,7 @@ Candidates (format: [Sources: count] Title (URL)):
 
                 if selected_articles:
                     return selected_articles[:max_count]
-                
+
             except ArticleSelectionError:
                 raise
             except Exception as e:
@@ -493,22 +640,37 @@ Candidate videos (format: [engagement metrics] "Title" by Channel (URL)):
 {candidate_entries}"""
 
             try:
-                config = types.GenerateContentConfig(
-                    response_mime_type='application/json',
-                    response_schema=list[SelectedVideo]
-                )
-                response = self.client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=config
-                )
+                # Multi-provider fallback for YouTube video selection
+                def _gemini_call(model_name: str):
+                    config = self._gemini_config(
+                        response_mime_type='application/json',
+                        response_schema=list[SelectedVideo],
+                    )
+                    response = self.client.models.generate_content(
+                        model=model_name, contents=prompt, config=config
+                    )
+                    if response.parsed is None:
+                        raise ValueError("Empty Gemini parsed response for video selection")
+                    return response.parsed
 
-                if response.parsed is None:
-                    logger.warning("AI YouTube video selection returned None parsed response")
-                    raise Exception("Parsed response is None")
+                def _arli_call():
+                    return self._arli_chat_json(
+                        prompt + f'\n\nReply with JSON: {{"selected": [{{"url": "...", "title": "..."}}, ...]}} — choose exactly {max_count} items from the candidates.',
+                        lambda d: [
+                            SelectedVideo(url=str(item.get("url", "")), title=str(item.get("title", "")))
+                            for item in (d.get("selected") or [])
+                            if item.get("url") and item.get("title")
+                        ]
+                    )
+
+                # Same reasoning as article selection: large structured output
+                # truncates on Mistral, so pin to Gemini-first regardless of primary.
+                parsed_videos = self._try_with_fallback(
+                    "AI YouTube video selection", _gemini_call, _arli_call, force_gemini_first=True
+                )
 
                 selected_videos = []
-                for video in response.parsed:
+                for video in parsed_videos:
                     url = video.url.strip()
                     title = video.title.strip()
                     selected_item = next(
@@ -584,21 +746,35 @@ Requirements:
 4. Use neutral, straightforward language
 5. Add ONE relevant hashtag that best represents the subject or category"""
 
-            config = types.GenerateContentConfig(
-                response_mime_type='application/json',
-                response_schema=TweetResponse
-            )
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=config
-            )
+            # Multi-provider fallback for tweet generation
+            def _gemini_call(model_name: str):
+                config = self._gemini_config(
+                    response_mime_type='application/json',
+                    response_schema=TweetResponse,
+                )
+                response = self.client.models.generate_content(
+                    model=model_name, contents=prompt, config=config
+                )
+                if response.parsed is None:
+                    raise ValueError("Empty Gemini parsed response for tweet generation")
+                return response.parsed
 
-            if response.parsed is None:
-                logger.warning("AI tweet generation returned None parsed response")
+            def _arli_call():
+                return self._arli_chat_json(
+                    prompt + '\n\nReply with JSON: {"tweet_text": "...", "hashtag": "OneWordTag", "summary": "..."}',
+                    lambda d: TweetResponse(
+                        tweet_text=str(d.get("tweet_text", "")).strip(),
+                        hashtag=str(d.get("hashtag", "")).strip(),
+                        summary=str(d.get("summary", "")).strip(),
+                    )
+                )
+
+            try:
+                parsed = self._try_with_fallback("tweet generation", _gemini_call, _arli_call)
+            except Exception as e:
+                logger.error(f"Tweet generation failed across all providers: {e}")
                 return None
 
-            parsed = response.parsed
             tweet_text = parsed.tweet_text
             generated_hashtag = parsed.hashtag
             summary_text = parsed.summary

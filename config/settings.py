@@ -70,9 +70,32 @@ DEFAULT_PLATFORMS = _enabled_platforms if _enabled_platforms else ["bluesky"]  #
 DEFAULT_AI_MODELS = [
     'gemini-2.5-flash-lite',
     'gemini-2.5-flash',
-    'gemini-2.0-flash-lite',
-    'gemini-2.0-flash'
+    # Note: gemini-2.0-flash{,-lite} returned 404 from the Generative Language API
+    # as of 2026-06-18 (Google deprecated them). Pruned from the fallback chain.
 ]
+
+# Gemini thinking budget. Gemini 2.5 models do internal chain-of-thought reasoning
+# by default; tokens generated during reasoning are billed as output tokens but
+# never surface in the response. Disabling thinking on the more expensive
+# gemini-2.5-flash fallback cut ~1000+ output tokens per call in benchmarks.
+#   0    -> thinking disabled (recommended default for cost control)
+#   N>0  -> custom token budget for thinking
+#   -1   -> dynamic budget chosen by the model (Google's default behavior)
+GEMINI_THINKING_BUDGET = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
+
+# Arli AI fallback (OpenAI-compatible API, used only when all Gemini models fail)
+ARLI_API_KEY = os.getenv("ARLI_API_KEY", "")
+ARLI_BASE_URL = os.getenv("ARLI_BASE_URL", "https://api.arliai.com/v1")
+ARLI_MODEL = os.getenv("ARLI_MODEL", "Qwen3.5-27B-Derestricted")
+ARLI_MAX_TOKENS = 5000   # Headroom for non-thinking models (e.g. Mistral) to emit
+                         # large structured outputs like 15-item article selection JSON
+                         # without truncating mid-string.
+
+# Primary AI provider — picks which provider the fallback chain starts with.
+# "gemini" (default): chain is [gemini-2.5-flash-lite, gemini-2.5-flash, arli]
+# "arli":             chain is [arli, gemini-2.5-flash-lite, gemini-2.5-flash]
+# Anything else falls back to "gemini" with a warning logged at init.
+AI_PRIMARY_PROVIDER = os.getenv("AI_PRIMARY_PROVIDER", "gemini").lower()
 
 # =============================================================================
 # Content Processing Settings
